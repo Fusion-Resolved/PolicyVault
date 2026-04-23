@@ -1,0 +1,10 @@
+[build]
+  command   = "bash build.sh"
+  publish   = "dist"
+
+# Set these in: Netlify Dashboard → Site → Site configuration → Environment variables
+# Never commit real values to your repo.
+#
+# Required variables:
+#   SUPABASE_URL       https://xxxx.supabase.co
+#   SUPABASE_ANON_KEY  sb_publishable_... or the JWT anon key from Supabase → Settings → API
