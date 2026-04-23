@@ -894,11 +894,35 @@
     // ══════════════════════════════════════════════════════════════
     //  SETUP SCREEN
     // ══════════════════════════════════════════════════════════════
-    const SetupScreen = () => (
+    const SetupScreen = () => {
+      const urlVal = SUPABASE_URL;
+      const keyVal = SUPABASE_ANON_KEY;
+      const urlOk  = urlVal !== '__SUPABASE_URL__' && urlVal.length > 10;
+      const keyOk  = keyVal !== '__SUPABASE_ANON_KEY__' && keyVal.length > 10;
+      const diagStyle = { fontSize: 12, fontFamily: 'monospace', padding: '10px 14px', borderRadius: 'var(--r)', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 10 };
+      return (
       <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '2rem' }}>
         <div style={{ maxWidth: 520, width: '100%' }}>
           <h1 style={{ fontFamily: 'var(--font-d)', fontSize: 50, fontWeight: 300, marginBottom: 10, letterSpacing: '-0.03em' }}>PolicyVault</h1>
           <p style={{ color: 'var(--text-2)', marginBottom: 28, lineHeight: 1.7 }}>Set <code style={{ background: 'var(--surface-2)', padding: '2px 6px', borderRadius: 5, fontSize: 12, fontWeight: 700 }}>SUPABASE_URL</code> and <code style={{ background: 'var(--surface-2)', padding: '2px 6px', borderRadius: 5, fontSize: 12, fontWeight: 700 }}>SUPABASE_ANON_KEY</code> as Netlify environment variables, then trigger a redeploy.</p>
+
+          <div style={{ marginBottom: 20, background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--r-lg)', padding: '14px 16px' }}>
+            <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--text-3)', marginBottom: 10 }}>🔍 Diagnostics</div>
+            <div style={{ ...diagStyle, background: urlOk ? 'var(--accent-bg)' : 'var(--danger-bg)', color: urlOk ? 'var(--accent)' : 'var(--danger)' }}>
+              <span>{urlOk ? '✓' : '✗'}</span>
+              <span>SUPABASE_URL: {urlOk ? urlVal.slice(0, 30) + '…' : `"${urlVal}" (not substituted)`}</span>
+            </div>
+            <div style={{ ...diagStyle, background: keyOk ? 'var(--accent-bg)' : 'var(--danger-bg)', color: keyOk ? 'var(--accent)' : 'var(--danger)' }}>
+              <span>{keyOk ? '✓' : '✗'}</span>
+              <span>SUPABASE_ANON_KEY: {keyOk ? keyVal.slice(0, 20) + '…' : `"${keyVal}" (not substituted)`}</span>
+            </div>
+            {urlOk && keyOk && (
+              <div style={{ fontSize: 12, color: 'var(--amber)', marginTop: 6 }}>
+                ⚠ Credentials look substituted — hard-refresh the page (Ctrl+Shift+R / Cmd+Shift+R) or clear cache and try again.
+              </div>
+            )}
+          </div>
+
           <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--r-lg)', overflow: 'hidden', boxShadow: 'var(--shadow-sm)' }}>
             {[
               ['Create Supabase project', 'supabase.com → New project (free tier)'],
@@ -915,7 +939,8 @@
           </div>
         </div>
       </div>
-    );
+      );
+    };
 
     // ══════════════════════════════════════════════════════════════
     //  ROOT APP
