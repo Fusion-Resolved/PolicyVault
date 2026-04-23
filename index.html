@@ -1,0 +1,929 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="PolicyVault">
+  <meta name="description" content="Policy document management platform">
+  <title>PolicyVault</title>
+
+  <link rel="manifest" href="/manifest.json">
+  <link rel="apple-touch-icon" href="/icon-192.png">
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;1,400&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:           #F9F8F5;
+      --surface:      #FFFFFF;
+      --surface-2:    #F3F1EC;
+      --surface-3:    #ECEAE4;
+      --text:         #1C1A16;
+      --text-2:       #6A6760;
+      --text-3:       #A09E99;
+      --border:       rgba(0,0,0,0.07);
+      --border-2:     rgba(0,0,0,0.12);
+      --accent:       #2D6A5C;
+      --accent-hover: #235449;
+      --accent-bg:    #E8F3F0;
+      --accent-text:  #1A3D37;
+      --accent-muted: rgba(45,106,92,0.12);
+      --amber:        #92620A;
+      --amber-bg:     #FEF3DC;
+      --danger:       #B33;
+      --danger-bg:    rgba(187,51,51,0.07);
+      --sidebar-w:    230px;
+      --list-w:       290px;
+      --header-h:     54px;
+      --font-d:       'Cormorant Garamond', Georgia, serif;
+      --font-u:       'DM Sans', -apple-system, sans-serif;
+      --r:            6px;
+      --r-lg:         10px;
+    }
+
+    [data-dark="true"] {
+      --bg:           #111210;
+      --surface:      #191A18;
+      --surface-2:    #202220;
+      --surface-3:    #292B28;
+      --text:         #EDEBE4;
+      --text-2:       #8A8880;
+      --text-3:       #585754;
+      --border:       rgba(255,255,255,0.06);
+      --border-2:     rgba(255,255,255,0.1);
+      --accent:       #4DBBA8;
+      --accent-hover: #5ECBBA;
+      --accent-bg:    #162725;
+      --accent-text:  #7DD4C8;
+      --accent-muted: rgba(77,187,168,0.12);
+      --amber:        #E4A84A;
+      --amber-bg:     #2A2010;
+      --danger:       #E07070;
+      --danger-bg:    rgba(224,112,112,0.08);
+    }
+
+    html, body, #root { height: 100%; }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--font-u);
+      font-size: 14px;
+      line-height: 1.5;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+    }
+
+    ::-webkit-scrollbar { width: 5px; height: 5px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: var(--border-2); border-radius: 3px; }
+    ::-webkit-scrollbar-thumb:hover { background: var(--text-3); }
+
+    input, textarea, button, select { font-family: var(--font-u); }
+
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .spin { animation: spin 0.8s linear infinite; }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(4px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+    .fade-in { animation: fadeIn 0.18s ease-out both; }
+
+    @keyframes slideUp {
+      from { opacity: 0; transform: translateY(12px) scale(0.98); }
+      to   { opacity: 1; transform: translateY(0) scale(1); }
+    }
+    .slide-up { animation: slideUp 0.22s cubic-bezier(0.34,1.2,0.64,1) both; }
+
+    @keyframes authIn {
+      from { opacity: 0; transform: translateY(20px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+    .auth-in { animation: authIn 0.32s cubic-bezier(0.22,1,0.36,1) both; }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+
+  <script type="text/babel">
+    const { useState, useEffect, useCallback, useRef, useMemo } = React;
+
+    // ══════════════════════════════════════════════════════════════
+    //  CONFIGURATION — replace with your Supabase project values
+    //  Find them at: Supabase Dashboard > Settings > API
+    // ══════════════════════════════════════════════════════════════
+    const SUPABASE_URL      = 'https://gcbstllhgwwvcjxcmyfd.supabase.co';
+    const SUPABASE_ANON_KEY = 'sb_publishable_8giHceQEae5jy7EEAG4NQw_mVYWBuN1';
+
+    const configured = SUPABASE_URL !== 'YOUR_SUPABASE_URL';
+    const db = configured
+      ? supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+          auth: { persistSession: true, autoRefreshToken: true, storageKey: 'pv-auth' }
+        })
+      : null;
+
+    // ── Utilities ──────────────────────────────────────────────────
+    const debounce = (fn, ms) => {
+      let t;
+      return (...a) => { clearTimeout(t); t = setTimeout(() => fn(...a), ms); };
+    };
+    const fmtDate = (iso) => iso
+      ? new Date(iso).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })
+      : '';
+    const dedupe = (a, b) => {
+      const s = new Set();
+      return [...a, ...b].filter(x => { if (s.has(x.id)) return false; s.add(x.id); return true; });
+    };
+    const setArr = (s) => [...s].sort((a, b) => a.localeCompare(b));
+    const initials = (email = '') => {
+      const p = email.split('@')[0].split(/[._-]/);
+      return p.slice(0, 2).map(x => x[0]?.toUpperCase() || '').join('') || '?';
+    };
+
+    // ── Auth helpers ───────────────────────────────────────────────
+    const authSignIn  = (email, pw)  => db.auth.signInWithPassword({ email, password: pw });
+    const authSignUp  = (email, pw)  => db.auth.signUp({ email, password: pw });
+    const authSignOut = ()           => db.auth.signOut();
+
+    const getProfile = async (uid) => {
+      const { data } = await db.from('user_profiles').select('*').eq('id', uid).single();
+      return data;
+    };
+    const getAllProfiles = async () => {
+      const { data } = await db.from('user_profiles').select('*').order('created_at', { ascending: false });
+      return data || [];
+    };
+    const approveUser = (id) => db.rpc('approve_user', { target_id: id });
+    const revokeUser  = (id) => db.rpc('revoke_user',  { target_id: id });
+    const promoteUser = (id) => db.from('user_profiles').update({ role: 'admin' }).eq('id', id);
+    const demoteUser  = (id) => db.from('user_profiles').update({ role: 'user'  }).eq('id', id);
+
+    // ── Policies helpers ───────────────────────────────────────────
+    const COLS = 'id,name,primary_category,secondary_category,tertiary_category,updated_at';
+
+    const apiSearch = async ({ query = '', primary = '', secondary = '', tertiary = '' } = {}) => {
+      if (!db) return [];
+      const fil = q => {
+        if (primary)   q = q.eq('primary_category', primary);
+        if (secondary) q = q.eq('secondary_category', secondary);
+        if (tertiary)  q = q.eq('tertiary_category', tertiary);
+        return q;
+      };
+      if (query.trim()) {
+        const [{ data: d1 }, { data: d2 }] = await Promise.all([
+          fil(db.from('policies').select(COLS).ilike('name', `%${query}%`)),
+          fil(db.from('policies').select(COLS).textSearch('search_vector', query, { type: 'websearch', config: 'english' })),
+        ]);
+        return dedupe(d1 || [], d2 || []);
+      }
+      const { data } = await fil(db.from('policies').select(COLS).order('updated_at', { ascending: false }));
+      return data || [];
+    };
+
+    const apiGetPolicy = async (id) => {
+      const { data } = await db.from('policies').select('*').eq('id', id).single();
+      return data;
+    };
+
+    const apiGetCats = async () => {
+      const { data } = await db.from('policies').select('primary_category,secondary_category,tertiary_category');
+      if (!data) return { primaries: [], byPrimary: {}, bySecondary: {} };
+      const pS = new Set(), byP = {}, byS = {};
+      data.forEach(({ primary_category: p, secondary_category: s, tertiary_category: t }) => {
+        if (!p) return;
+        pS.add(p);
+        if (s) {
+          if (!byP[p]) byP[p] = new Set();
+          byP[p].add(s);
+          if (t) {
+            const k = `${p}||${s}`;
+            if (!byS[k]) byS[k] = new Set();
+            byS[k].add(t);
+          }
+        }
+      });
+      return {
+        primaries: setArr(pS),
+        byPrimary:   Object.fromEntries(Object.entries(byP).map(([k, v]) => [k, setArr(v)])),
+        bySecondary: Object.fromEntries(Object.entries(byS).map(([k, v]) => [k, setArr(v)])),
+      };
+    };
+
+    const apiSave = async (form, id = null) => {
+      const p = {
+        name: form.name.trim(), content: form.content.trim(),
+        primary_category:   form.primary_category.trim(),
+        secondary_category: form.secondary_category?.trim() || null,
+        tertiary_category:  form.tertiary_category?.trim()  || null,
+      };
+      if (id) return db.from('policies').update(p).eq('id', id).select().single();
+      return db.from('policies').insert(p).select().single();
+    };
+
+    // ══════════════════════════════════════════════════════════════
+    //  ICONS
+    // ══════════════════════════════════════════════════════════════
+    const I = {
+      Search:  () => <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>,
+      Sun:     () => <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="5"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>,
+      Moon:    () => <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>,
+      Plus:    () => <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>,
+      CRight:  () => <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><path d="m9 18 6-6-6-6"/></svg>,
+      CDown:   () => <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><path d="m6 9 6 6 6-6"/></svg>,
+      Edit:    () => <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4z"/></svg>,
+      X:       () => <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>,
+      Folder:  () => <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>,
+      File2:   () => <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>,
+      Spin:    () => <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" className="spin"><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/></svg>,
+      LogOut:  () => <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>,
+      Users:   () => <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg>,
+      Check:   () => <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><polyline points="20 6 9 17 4 12"/></svg>,
+      Shield:  () => <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>,
+      Eye:     () => <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>,
+      EyeOff:  () => <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>,
+      Kbd:     ({ k }) => <kbd style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', minWidth: 18, height: 18, padding: '0 4px', background: 'var(--surface-3)', border: '1px solid var(--border-2)', borderRadius: 3, fontSize: 10, fontFamily: 'monospace', color: 'var(--text-3)' }}>{k}</kbd>,
+    };
+
+    // ── Button ─────────────────────────────────────────────────────
+    const Btn = ({ children, onClick, variant = 'default', size = 'md', disabled, title, full, style: sx }) => {
+      const base = { display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 5, border: 'none', borderRadius: 'var(--r)', cursor: disabled ? 'not-allowed' : 'pointer', fontFamily: 'var(--font-u)', fontWeight: 500, opacity: disabled ? 0.45 : 1, whiteSpace: 'nowrap', transition: 'background 0.12s, color 0.12s', userSelect: 'none', width: full ? '100%' : undefined };
+      const sz = { sm: { padding: '5px 10px', fontSize: 12 }, md: { padding: '7px 13px', fontSize: 13 }, lg: { padding: '10px 18px', fontSize: 14 } };
+      const vr = { default: { background: 'var(--surface)', color: 'var(--text)', border: '1px solid var(--border-2)' }, primary: { background: 'var(--accent)', color: '#fff' }, ghost: { background: 'transparent', color: 'var(--text-2)' }, danger: { background: 'transparent', color: 'var(--danger)', border: '1px solid var(--danger)' }, approve: { background: 'var(--accent-bg)', color: 'var(--accent)' } };
+      return <button onClick={onClick} disabled={disabled} title={title} style={{ ...base, ...sz[size], ...vr[variant], ...sx }}>{children}</button>;
+    };
+
+    // ══════════════════════════════════════════════════════════════
+    //  AUTH PAGE
+    // ══════════════════════════════════════════════════════════════
+    const AuthPage = ({ dark, onToggleDark }) => {
+      const [mode, setMode]     = useState('signin');
+      const [email, setEmail]   = useState('');
+      const [pw, setPw]         = useState('');
+      const [pw2, setPw2]       = useState('');
+      const [showPw, setShowPw] = useState(false);
+      const [loading, setLoading] = useState(false);
+      const [err, setErr]       = useState('');
+      const [ok, setOk]         = useState('');
+      const emailRef = useRef(null);
+
+      useEffect(() => { setErr(''); setOk(''); setTimeout(() => emailRef.current?.focus(), 60); }, [mode]);
+
+      const submit = async (e) => {
+        e?.preventDefault(); setErr(''); setOk('');
+        if (!email.trim()) { setErr('Email is required.'); return; }
+        if (!pw)           { setErr('Password is required.'); return; }
+        if (mode === 'signup') {
+          if (pw.length < 8) { setErr('Password must be at least 8 characters.'); return; }
+          if (pw !== pw2)    { setErr('Passwords do not match.'); return; }
+        }
+        setLoading(true);
+        if (mode === 'signin') {
+          const { error } = await authSignIn(email.trim(), pw);
+          if (error) { setErr(error.message); setLoading(false); }
+        } else {
+          const { error } = await authSignUp(email.trim(), pw);
+          setLoading(false);
+          if (error) { setErr(error.message); return; }
+          setOk('Request submitted. An administrator will review and approve your account.');
+          setMode('signin'); setPw(''); setPw2('');
+        }
+      };
+
+      const inp = { width: '100%', padding: '9px 12px', border: '1px solid var(--border-2)', borderRadius: 'var(--r)', background: 'var(--bg)', color: 'var(--text)', fontFamily: 'var(--font-u)', fontSize: 14, outline: 'none', transition: 'border-color 0.15s' };
+      const lbl = { fontSize: 12, fontWeight: 500, color: 'var(--text-2)', marginBottom: 5, display: 'block' };
+      const focus = e => e.target.style.borderColor = 'var(--accent)';
+      const blur  = e => e.target.style.borderColor = 'var(--border-2)';
+
+      return (
+        <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '2rem', position: 'relative' }}>
+          <button onClick={onToggleDark} title={dark ? 'Light mode' : 'Dark mode'}
+            style={{ position: 'absolute', top: 18, right: 18, background: 'transparent', border: '1px solid var(--border-2)', cursor: 'pointer', color: 'var(--text-2)', display: 'flex', alignItems: 'center', justifyContent: 'center', width: 30, height: 30, borderRadius: 'var(--r)' }}>
+            {dark ? <I.Sun /> : <I.Moon />}
+          </button>
+
+          <div className="auth-in" style={{ width: '100%', maxWidth: 380 }}>
+            <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
+              <h1 style={{ fontFamily: 'var(--font-d)', fontSize: 40, fontWeight: 400, letterSpacing: '-0.02em', lineHeight: 1 }}>PolicyVault</h1>
+              <p style={{ fontSize: 13, color: 'var(--text-3)', marginTop: 6 }}>Policy document management</p>
+            </div>
+
+            <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--r-lg)', padding: '1.75rem', boxShadow: '0 4px 24px rgba(0,0,0,0.06)' }}>
+              {/* Mode tabs */}
+              <div style={{ display: 'flex', gap: 2, background: 'var(--surface-2)', borderRadius: 'var(--r)', padding: 3, marginBottom: '1.5rem' }}>
+                {[['signin', 'Sign In'], ['signup', 'Request Access']].map(([m, lbl]) => (
+                  <button key={m} onClick={() => setMode(m)}
+                    style={{ flex: 1, padding: '6px 0', fontSize: 12.5, fontWeight: 500, border: 'none', borderRadius: 5, cursor: 'pointer', fontFamily: 'var(--font-u)', background: mode === m ? 'var(--surface)' : 'transparent', color: mode === m ? 'var(--text)' : 'var(--text-3)', boxShadow: mode === m ? '0 1px 3px rgba(0,0,0,0.08)' : 'none', transition: 'all 0.15s' }}>
+                    {lbl}
+                  </button>
+                ))}
+              </div>
+
+              <form onSubmit={submit} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+                <div>
+                  <label style={lbl}>Email address</label>
+                  <input ref={emailRef} type="email" autoComplete="email" style={inp} value={email} onChange={e => setEmail(e.target.value)} onFocus={focus} onBlur={blur} placeholder="you@example.com" />
+                </div>
+
+                <div>
+                  <label style={lbl}>Password {mode === 'signup' && <span style={{ color: 'var(--text-3)', fontWeight: 400 }}>(min. 8 characters)</span>}</label>
+                  <div style={{ position: 'relative' }}>
+                    <input type={showPw ? 'text' : 'password'} autoComplete={mode === 'signin' ? 'current-password' : 'new-password'} style={{ ...inp, paddingRight: 38 }} value={pw} onChange={e => setPw(e.target.value)} onFocus={focus} onBlur={blur} placeholder={mode === 'signup' ? 'Choose a strong password' : 'Your password'} />
+                    <button type="button" onClick={() => setShowPw(v => !v)} style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-3)', display: 'flex' }}>
+                      {showPw ? <I.EyeOff /> : <I.Eye />}
+                    </button>
+                  </div>
+                </div>
+
+                {mode === 'signup' && (
+                  <div>
+                    <label style={lbl}>Confirm password</label>
+                    <input type={showPw ? 'text' : 'password'} autoComplete="new-password" style={inp} value={pw2} onChange={e => setPw2(e.target.value)} onFocus={focus} onBlur={blur} placeholder="Repeat your password" />
+                  </div>
+                )}
+
+                {err && <div style={{ fontSize: 12.5, color: 'var(--danger)', background: 'var(--danger-bg)', padding: '8px 11px', borderRadius: 'var(--r)', borderLeft: '3px solid var(--danger)' }}>{err}</div>}
+                {ok  && <div style={{ fontSize: 12.5, color: 'var(--accent)', background: 'var(--accent-bg)', padding: '8px 11px', borderRadius: 'var(--r)', borderLeft: '3px solid var(--accent)' }}>{ok}</div>}
+
+                <button type="submit" disabled={loading}
+                  style={{ width: '100%', padding: '10px', marginTop: 2, background: loading ? 'var(--accent-bg)' : 'var(--accent)', color: loading ? 'var(--accent)' : '#fff', border: 'none', borderRadius: 'var(--r)', fontFamily: 'var(--font-u)', fontSize: 14, fontWeight: 500, cursor: loading ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, transition: 'all 0.15s' }}>
+                  {loading && <I.Spin />}
+                  {loading ? 'Please wait…' : mode === 'signin' ? 'Sign In' : 'Request Access'}
+                </button>
+              </form>
+
+              {mode === 'signup' && (
+                <p style={{ fontSize: 11.5, color: 'var(--text-3)', marginTop: 14, lineHeight: 1.6, textAlign: 'center' }}>
+                  New accounts require administrator approval before access is granted.
+                </p>
+              )}
+            </div>
+          </div>
+        </div>
+      );
+    };
+
+    // ══════════════════════════════════════════════════════════════
+    //  PENDING PAGE
+    // ══════════════════════════════════════════════════════════════
+    const PendingPage = ({ profile, dark, onToggleDark, onSignOut }) => (
+      <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '2rem', position: 'relative' }}>
+        <button onClick={onToggleDark} style={{ position: 'absolute', top: 18, right: 18, background: 'transparent', border: '1px solid var(--border-2)', cursor: 'pointer', color: 'var(--text-2)', display: 'flex', alignItems: 'center', justifyContent: 'center', width: 30, height: 30, borderRadius: 'var(--r)' }}>
+          {dark ? <I.Sun /> : <I.Moon />}
+        </button>
+        <div className="auth-in" style={{ width: '100%', maxWidth: 380, textAlign: 'center' }}>
+          <div style={{ width: 56, height: 56, borderRadius: '50%', background: 'var(--amber-bg)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 1.5rem', color: 'var(--amber)' }}>
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+          </div>
+          <h2 style={{ fontFamily: 'var(--font-d)', fontSize: 26, fontWeight: 400, marginBottom: 10 }}>Awaiting Approval</h2>
+          <p style={{ color: 'var(--text-2)', fontSize: 14, lineHeight: 1.65, marginBottom: 6 }}>
+            Your account for <strong style={{ color: 'var(--text)' }}>{profile?.email}</strong> is pending review.
+          </p>
+          <p style={{ color: 'var(--text-3)', fontSize: 13, lineHeight: 1.65, marginBottom: '2rem' }}>
+            An administrator will grant access shortly. Sign in again once you've been notified.
+          </p>
+          <Btn variant="default" onClick={onSignOut}><I.LogOut /> Sign Out</Btn>
+        </div>
+      </div>
+    );
+
+    // ══════════════════════════════════════════════════════════════
+    //  USER MANAGEMENT MODAL
+    // ══════════════════════════════════════════════════════════════
+    const UserManagementModal = ({ open, currentUserId, onClose }) => {
+      const [users, setUsers] = useState([]);
+      const [loading, setLoading] = useState(false);
+      const [busy, setBusy] = useState({});
+
+      const load = useCallback(async () => { setLoading(true); setUsers(await getAllProfiles()); setLoading(false); }, []);
+      useEffect(() => { if (open) load(); }, [open]);
+
+      const act = async (fn, id) => { setBusy(b => ({ ...b, [id]: true })); await fn(id); await load(); setBusy(b => ({ ...b, [id]: false })); };
+
+      if (!open) return null;
+
+      const pending  = users.filter(u => !u.approved);
+      const approved = users.filter(u => u.approved);
+
+      const UserRow = ({ u }) => (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '9px 0', borderBottom: '1px solid var(--border)' }}>
+          <div style={{ width: 30, height: 30, borderRadius: '50%', background: u.approved ? 'var(--accent-bg)' : 'var(--surface-2)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 600, color: u.approved ? 'var(--accent)' : 'var(--text-3)', flexShrink: 0 }}>
+            {initials(u.email)}
+          </div>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontSize: 13, fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: 5 }}>
+              {u.email}
+              {u.id === currentUserId && <span style={{ fontSize: 10, padding: '1px 5px', background: 'var(--accent-muted)', color: 'var(--accent)', borderRadius: 3 }}>you</span>}
+              {u.role === 'admin' && <span style={{ fontSize: 10, padding: '1px 5px', background: 'var(--surface-3)', color: 'var(--text-3)', borderRadius: 3, display: 'inline-flex', alignItems: 'center', gap: 3 }}><I.Shield /> admin</span>}
+            </div>
+            <div style={{ fontSize: 11, color: 'var(--text-3)' }}>
+              Requested {fmtDate(u.created_at)}{u.approved_at && ` · Approved ${fmtDate(u.approved_at)}`}
+            </div>
+          </div>
+          {u.id !== currentUserId && (
+            <div style={{ display: 'flex', gap: 5, flexShrink: 0 }}>
+              {!u.approved
+                ? <Btn variant="approve" size="sm" disabled={busy[u.id]} onClick={() => act(approveUser, u.id)}><I.Check /> Approve</Btn>
+                : <>
+                    {u.role === 'user'
+                      ? <Btn variant="default" size="sm" disabled={busy[u.id]} onClick={() => act(promoteUser, u.id)}><I.Shield /> Make Admin</Btn>
+                      : <Btn variant="default" size="sm" disabled={busy[u.id]} onClick={() => act(demoteUser,  u.id)}>Demote</Btn>
+                    }
+                    <Btn variant="danger" size="sm" disabled={busy[u.id]} onClick={() => act(revokeUser, u.id)}>Revoke</Btn>
+                  </>
+              }
+            </div>
+          )}
+        </div>
+      );
+
+      return (
+        <div onClick={e => { if (e.target === e.currentTarget) onClose(); }}
+          style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 200, padding: '1rem', backdropFilter: 'blur(2px)' }}>
+          <div className="slide-up" style={{ background: 'var(--surface)', borderRadius: 'var(--r-lg)', width: '100%', maxWidth: 560, maxHeight: '85vh', display: 'flex', flexDirection: 'column', boxShadow: '0 20px 60px rgba(0,0,0,0.25), 0 0 0 1px var(--border)' }}>
+            <div style={{ padding: '14px 18px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
+              <div>
+                <h2 style={{ fontFamily: 'var(--font-d)', fontSize: 20, fontWeight: 400 }}>User Management</h2>
+                <p style={{ fontSize: 12, color: 'var(--text-3)', marginTop: 2 }}>{users.length} account{users.length !== 1 ? 's' : ''} total</p>
+              </div>
+              <button onClick={onClose} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-2)', display: 'flex', padding: 4, borderRadius: 'var(--r)' }}><I.X /></button>
+            </div>
+            <div style={{ flex: 1, overflowY: 'auto', padding: '0 18px' }}>
+              {loading
+                ? <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '3rem', color: 'var(--text-3)' }}><I.Spin /></div>
+                : <>
+                    {pending.length > 0 && (
+                      <div style={{ marginTop: 14 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+                          <span style={{ fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.07em', color: 'var(--amber)' }}>Pending Approval</span>
+                          <span style={{ fontSize: 11, background: 'var(--amber-bg)', color: 'var(--amber)', padding: '1px 6px', borderRadius: 10, fontWeight: 600 }}>{pending.length}</span>
+                        </div>
+                        {pending.map(u => <UserRow key={u.id} u={u} />)}
+                      </div>
+                    )}
+                    <div style={{ marginTop: pending.length ? 20 : 14 }}>
+                      <div style={{ fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.07em', color: 'var(--text-3)', marginBottom: 4 }}>
+                        Approved · {approved.length}
+                      </div>
+                      {approved.length === 0
+                        ? <p style={{ fontSize: 13, color: 'var(--text-3)', padding: '1rem 0' }}>None yet.</p>
+                        : approved.map(u => <UserRow key={u.id} u={u} />)
+                      }
+                    </div>
+                  </>
+              }
+            </div>
+            <div style={{ padding: '10px 18px', borderTop: '1px solid var(--border)', flexShrink: 0 }}>
+              <Btn variant="ghost" size="sm" onClick={load} disabled={loading}>Refresh</Btn>
+            </div>
+          </div>
+        </div>
+      );
+    };
+
+    // ══════════════════════════════════════════════════════════════
+    //  POLICY COMPONENTS
+    // ══════════════════════════════════════════════════════════════
+    const Sidebar = ({ cats, sel, onSelect, loading }) => {
+      const [openP, setOpenP] = useState({});
+      const [openS, setOpenS] = useState({});
+      const row = (active) => ({ width: '100%', textAlign: 'left', padding: '5px 10px 5px 12px', background: active ? 'var(--accent-muted)' : 'transparent', color: active ? 'var(--accent)' : 'var(--text-2)', border: 'none', cursor: 'pointer', fontSize: 12.5, fontWeight: active ? 500 : 400, borderRadius: 'var(--r)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 4, transition: 'background 0.1s, color 0.1s', fontFamily: 'var(--font-u)' });
+      const isP = (p) => sel.primary === p && !sel.secondary;
+      const isS = (p, s) => sel.primary === p && sel.secondary === s && !sel.tertiary;
+      const isT = (p, s, t) => sel.primary === p && sel.secondary === s && sel.tertiary === t;
+      return (
+        <aside style={{ width: 'var(--sidebar-w)', minWidth: 'var(--sidebar-w)', borderRight: '1px solid var(--border)', overflowY: 'auto', padding: '12px 8px 20px', display: 'flex', flexDirection: 'column', gap: 1 }}>
+          <div style={{ fontSize: 10, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--text-3)', fontWeight: 600, padding: '2px 10px 8px' }}>Categories</div>
+          <button style={row(!sel.primary)} onClick={() => onSelect({})}><span style={{ display: 'flex', alignItems: 'center', gap: 6 }}><I.File2 /> All Policies</span></button>
+          {loading
+            ? <div style={{ padding: '12px 10px', color: 'var(--text-3)', fontSize: 12, display: 'flex', alignItems: 'center', gap: 6 }}><I.Spin /> Loading…</div>
+            : cats.primaries.map(p => {
+                const subs = cats.byPrimary[p] || [], pOpen = openP[p];
+                return (
+                  <div key={p}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                      <button style={{ ...row(isP(p)), flex: 1 }} onClick={() => { onSelect({ primary: p }); setOpenP(o => ({ ...o, [p]: true })); }} onMouseEnter={e => { if (!isP(p)) e.currentTarget.style.background = 'var(--surface-2)'; }} onMouseLeave={e => { if (!isP(p)) e.currentTarget.style.background = 'transparent'; }}>
+                        <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}><I.Folder /> {p}</span>
+                      </button>
+                      {subs.length > 0 && <button onClick={() => setOpenP(o => ({ ...o, [p]: !o[p] }))} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-3)', padding: '4px 5px', borderRadius: 'var(--r)', display: 'flex' }}>{pOpen ? <I.CDown /> : <I.CRight />}</button>}
+                    </div>
+                    {pOpen && subs.map(s => {
+                      const sk = `${p}||${s}`, terts = cats.bySecondary[sk] || [], sOpen = openS[sk];
+                      return (
+                        <div key={s} style={{ marginLeft: 14, borderLeft: '1px solid var(--border)' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 1, paddingLeft: 6 }}>
+                            <button style={{ ...row(isS(p, s)), flex: 1, fontSize: 12 }} onClick={() => { onSelect({ primary: p, secondary: s }); setOpenS(o => ({ ...o, [sk]: true })); }} onMouseEnter={e => { if (!isS(p, s)) e.currentTarget.style.background = 'var(--surface-2)'; }} onMouseLeave={e => { if (!isS(p, s)) e.currentTarget.style.background = 'transparent'; }}>{s}</button>
+                            {terts.length > 0 && <button onClick={() => setOpenS(o => ({ ...o, [sk]: !o[sk] }))} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-3)', padding: '4px 5px', borderRadius: 'var(--r)', display: 'flex' }}>{sOpen ? <I.CDown /> : <I.CRight />}</button>}
+                          </div>
+                          {sOpen && terts.map(t => <button key={t} style={{ ...row(isT(p, s, t)), width: 'calc(100% - 6px)', marginLeft: 6, fontSize: 11.5, paddingLeft: 10 }} onClick={() => onSelect({ primary: p, secondary: s, tertiary: t })} onMouseEnter={e => { if (!isT(p, s, t)) e.currentTarget.style.background = 'var(--surface-2)'; }} onMouseLeave={e => { if (!isT(p, s, t)) e.currentTarget.style.background = 'transparent'; }}>{t}</button>)}
+                        </div>
+                      );
+                    })}
+                  </div>
+                );
+              })
+          }
+        </aside>
+      );
+    };
+
+    const PolicyList = ({ policies, selectedId, onSelect, loading, query }) => {
+      const refs = useRef({});
+      useEffect(() => { if (selectedId && refs.current[selectedId]) refs.current[selectedId].scrollIntoView({ block: 'nearest', behavior: 'smooth' }); }, [selectedId]);
+      if (loading) return <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-3)' }}><I.Spin /></div>;
+      if (!policies.length) return <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 10, color: 'var(--text-3)', padding: '2rem' }}><I.File2 /><span style={{ fontSize: 13, textAlign: 'center' }}>{query ? `No results for "${query}"` : 'No policies yet'}</span></div>;
+      return (
+        <div style={{ flex: 1, overflowY: 'auto', padding: '6px 0' }}>
+          {policies.map((p) => {
+            const a = p.id === selectedId;
+            return (
+              <div key={p.id} ref={el => { refs.current[p.id] = el; }} onClick={() => onSelect(p, policies.indexOf(p))}
+                style={{ padding: '9px 16px', cursor: 'pointer', background: a ? 'var(--accent-muted)' : 'transparent', borderLeft: `2px solid ${a ? 'var(--accent)' : 'transparent'}`, transition: 'background 0.1s' }}
+                onMouseEnter={e => { if (!a) e.currentTarget.style.background = 'var(--surface-2)'; }}
+                onMouseLeave={e => { if (!a) e.currentTarget.style.background = 'transparent'; }}>
+                <div style={{ fontWeight: 500, fontSize: 13, color: a ? 'var(--accent-text)' : 'var(--text)', marginBottom: 3, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{p.name}</div>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6 }}>
+                  <div style={{ fontSize: 11, color: a ? 'var(--accent)' : 'var(--text-3)', display: 'flex', alignItems: 'center', gap: 3, minWidth: 0 }}>
+                    <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.primary_category}</span>
+                    {p.secondary_category && <><span>›</span><span>{p.secondary_category}</span></>}
+                    {p.tertiary_category && <><span>›</span><span>{p.tertiary_category}</span></>}
+                  </div>
+                  <span style={{ fontSize: 11, color: 'var(--text-3)', flexShrink: 0 }}>{fmtDate(p.updated_at)}</span>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      );
+    };
+
+    const PolicyDetail = ({ policy, loading, onEdit }) => {
+      if (loading) return <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><I.Spin /></div>;
+      if (!policy) return (
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 10, color: 'var(--text-3)' }}>
+          <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+          <span style={{ fontSize: 13 }}>Select a policy</span>
+          <div style={{ fontSize: 12, display: 'flex', gap: 6, alignItems: 'center', marginTop: 4 }}><I.Kbd k="↑" /><I.Kbd k="↓" /> to navigate</div>
+        </div>
+      );
+      return (
+        <div className="fade-in" style={{ flex: 1, display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
+          <div style={{ padding: '10px 24px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0, gap: 12 }}>
+            <div style={{ fontSize: 11, color: 'var(--text-3)', display: 'flex', alignItems: 'center', gap: 4, minWidth: 0 }}>
+              <span>{policy.primary_category}</span>
+              {policy.secondary_category && <><span>›</span><span>{policy.secondary_category}</span></>}
+              {policy.tertiary_category && <><span>›</span><span>{policy.tertiary_category}</span></>}
+            </div>
+            <Btn variant="default" size="sm" onClick={() => onEdit(policy)}><I.Edit /> Edit Policy</Btn>
+          </div>
+          <div style={{ flex: 1, overflowY: 'auto', padding: '2.5rem 3rem', maxWidth: 760 }}>
+            <h1 style={{ fontFamily: 'var(--font-d)', fontSize: 30, fontWeight: 400, lineHeight: 1.25, marginBottom: '0.4rem' }}>{policy.name}</h1>
+            <p style={{ fontSize: 12, color: 'var(--text-3)', marginBottom: '2.5rem' }}>Last updated {fmtDate(policy.updated_at)}</p>
+            <div style={{ fontSize: 14, lineHeight: 1.9, color: 'var(--text)', whiteSpace: 'pre-wrap', wordBreak: 'break-word', fontWeight: 300 }}>{policy.content}</div>
+          </div>
+        </div>
+      );
+    };
+
+    const PolicyModal = ({ open, mode, editPolicy, cats, onSave, onClose }) => {
+      const blank = { name: '', content: '', primary_category: '', secondary_category: '', tertiary_category: '' };
+      const [form, setForm] = useState(blank);
+      const [saving, setSaving] = useState(false);
+      const [err, setErr] = useState('');
+      const nameRef = useRef(null);
+
+      useEffect(() => {
+        if (!open) return;
+        setForm(mode === 'edit' && editPolicy ? { name: editPolicy.name || '', content: editPolicy.content || '', primary_category: editPolicy.primary_category || '', secondary_category: editPolicy.secondary_category || '', tertiary_category: editPolicy.tertiary_category || '' } : blank);
+        setErr(''); setSaving(false);
+        setTimeout(() => nameRef.current?.focus(), 50);
+      }, [open]);
+
+      const f = k => e => setForm(p => ({ ...p, [k]: e.target.value }));
+      const save = async () => {
+        if (!form.name.trim())             { setErr('Policy name is required.'); return; }
+        if (!form.primary_category.trim()) { setErr('Primary category is required.'); return; }
+        if (!form.content.trim())          { setErr('Policy content is required.'); return; }
+        setSaving(true); setErr('');
+        const { data, error } = await apiSave(form, mode === 'edit' ? editPolicy.id : null);
+        setSaving(false);
+        if (error) { setErr(error.message); return; }
+        onSave(data);
+      };
+
+      if (!open) return null;
+      const inp = { width: '100%', padding: '8px 11px', border: '1px solid var(--border-2)', borderRadius: 'var(--r)', background: 'var(--bg)', color: 'var(--text)', fontFamily: 'var(--font-u)', fontSize: 13, outline: 'none', transition: 'border-color 0.15s' };
+      const lbl = { fontSize: 11.5, fontWeight: 500, color: 'var(--text-3)', marginBottom: 5, display: 'block', textTransform: 'uppercase', letterSpacing: '0.05em' };
+      const foc = e => e.target.style.borderColor = 'var(--accent)';
+      const blr = e => e.target.style.borderColor = 'var(--border-2)';
+      return (
+        <div onClick={e => { if (e.target === e.currentTarget) onClose(); }} onKeyDown={e => { if (e.key === 'Escape') onClose(); if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') save(); }}
+          style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 200, padding: '1rem', backdropFilter: 'blur(2px)' }}>
+          <div className="slide-up" style={{ background: 'var(--surface)', borderRadius: 'var(--r-lg)', width: '100%', maxWidth: 680, maxHeight: '92vh', display: 'flex', flexDirection: 'column', boxShadow: '0 20px 60px rgba(0,0,0,0.25), 0 0 0 1px var(--border)' }}>
+            <div style={{ padding: '14px 18px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
+              <h2 style={{ fontFamily: 'var(--font-d)', fontSize: 22, fontWeight: 400 }}>{mode === 'add' ? 'New Policy' : 'Edit Policy'}</h2>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <span style={{ fontSize: 11, color: 'var(--text-3)' }}><I.Kbd k="⌘↵" /> to save</span>
+                <button onClick={onClose} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-2)', display: 'flex', padding: 4, borderRadius: 'var(--r)' }}><I.X /></button>
+              </div>
+            </div>
+            <div style={{ flex: 1, overflowY: 'auto', padding: '20px 22px', display: 'flex', flexDirection: 'column', gap: 16 }}>
+              <div><label style={lbl}>Policy Name *</label><input ref={nameRef} style={inp} value={form.name} onChange={f('name')} onFocus={foc} onBlur={blr} placeholder="e.g. Acceptable Use Policy" /></div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12 }}>
+                <div><label style={lbl}>Primary *</label><input style={inp} list="pv-p" value={form.primary_category} onChange={f('primary_category')} onFocus={foc} onBlur={blr} placeholder="e.g. HR" /><datalist id="pv-p">{cats.primaries.map(c => <option key={c} value={c} />)}</datalist></div>
+                <div><label style={lbl}>Secondary</label><input style={inp} list="pv-s" value={form.secondary_category} onChange={f('secondary_category')} onFocus={foc} onBlur={blr} placeholder="e.g. Conduct" /><datalist id="pv-s">{(cats.byPrimary[form.primary_category] || []).map(c => <option key={c} value={c} />)}</datalist></div>
+                <div><label style={lbl}>Tertiary</label><input style={inp} list="pv-t" value={form.tertiary_category} onChange={f('tertiary_category')} onFocus={foc} onBlur={blr} placeholder="e.g. Disciplinary" /><datalist id="pv-t">{(cats.bySecondary[`${form.primary_category}||${form.secondary_category}`] || []).map(c => <option key={c} value={c} />)}</datalist></div>
+              </div>
+              <div style={{ flex: 1 }}><label style={lbl}>Policy Content *</label><textarea style={{ ...inp, minHeight: 300, resize: 'vertical', lineHeight: 1.75, fontWeight: 300 }} value={form.content} onChange={f('content')} onFocus={foc} onBlur={blr} placeholder="Enter the full policy text…" /></div>
+              {err && <div style={{ fontSize: 13, color: 'var(--danger)', background: 'var(--danger-bg)', padding: '8px 12px', borderRadius: 'var(--r)', borderLeft: '3px solid var(--danger)' }}>{err}</div>}
+            </div>
+            <div style={{ padding: '12px 18px', borderTop: '1px solid var(--border)', display: 'flex', justifyContent: 'flex-end', gap: 8, flexShrink: 0 }}>
+              <Btn variant="ghost" onClick={onClose}>Cancel</Btn>
+              <Btn variant="primary" onClick={save} disabled={saving}>{saving ? 'Saving…' : mode === 'add' ? 'Create Policy' : 'Save Changes'}</Btn>
+            </div>
+          </div>
+        </div>
+      );
+    };
+
+    // ══════════════════════════════════════════════════════════════
+    //  SETUP SCREEN
+    // ══════════════════════════════════════════════════════════════
+    const SetupScreen = () => (
+      <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '2rem' }}>
+        <div style={{ maxWidth: 500, width: '100%' }}>
+          <h1 style={{ fontFamily: 'var(--font-d)', fontSize: 42, fontWeight: 300, marginBottom: 8, letterSpacing: '-0.02em' }}>PolicyVault</h1>
+          <p style={{ color: 'var(--text-2)', marginBottom: 24, lineHeight: 1.65 }}>Replace <code style={{ background: 'var(--surface-2)', padding: '1px 5px', borderRadius: 3, fontSize: 12 }}>SUPABASE_URL</code> and <code style={{ background: 'var(--surface-2)', padding: '1px 5px', borderRadius: 3, fontSize: 12 }}>SUPABASE_ANON_KEY</code> in this file to get started.</p>
+          <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--r-lg)', overflow: 'hidden' }}>
+            {[['Create Supabase project','supabase.com → New project (free tier)'],['Run both SQL files','SQL Editor: schema.sql then auth-schema.sql'],['Copy credentials','Settings → API → Project URL + anon key'],['Update index.html','Replace the two constants at the top'],['Deploy to Netlify','Drag folder to app.netlify.com/drop'],['Bootstrap first admin','Run the UPDATE query at the bottom of auth-schema.sql']].map(([t,d],i,arr) => (
+              <div key={i} style={{ display: 'flex', gap: 12, padding: '12px 18px', borderBottom: i < arr.length-1 ? '1px solid var(--border)' : 'none' }}>
+                <span style={{ minWidth: 22, height: 22, borderRadius: '50%', background: 'var(--accent-bg)', color: 'var(--accent)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 600, flexShrink: 0, marginTop: 1 }}>{i+1}</span>
+                <div><div style={{ fontSize: 13, fontWeight: 500, marginBottom: 2 }}>{t}</div><div style={{ fontSize: 12, color: 'var(--text-3)' }}>{d}</div></div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+
+    // ══════════════════════════════════════════════════════════════
+    //  ROOT APP
+    // ══════════════════════════════════════════════════════════════
+    function App() {
+      // authState: 'loading' | 'unauthenticated' | 'pending' | 'authenticated'
+      const [authState, setAuthState] = useState('loading');
+      const [user, setUser]           = useState(null);
+      const [profile, setProfile]     = useState(null);
+
+      const [dark, setDark] = useState(() => {
+        const s = localStorage.getItem('pv-dark');
+        return s !== null ? s === 'true' : window.matchMedia('(prefers-color-scheme: dark)').matches;
+      });
+
+      const [cats, setCats]                 = useState({ primaries: [], byPrimary: {}, bySecondary: {} });
+      const [catsLoading, setCatsLoading]   = useState(false);
+      const [policies, setPolicies]         = useState([]);
+      const [listLoading, setListLoading]   = useState(false);
+      const [query, setQuery]               = useState('');
+      const [sel, setSel]                   = useState({});
+      const [activePolicy, setActivePolicy] = useState(null);
+      const [activeId, setActiveId]         = useState(null);
+      const [activeIdx, setActiveIdx]       = useState(-1);
+      const [detailLoading, setDetailLoading] = useState(false);
+      const [policyModal, setPolicyModal]   = useState({ open: false, mode: 'add' });
+      const [usersModal, setUsersModal]     = useState(false);
+      const [userMenu, setUserMenu]         = useState(false);
+      const searchRef   = useRef(null);
+      const userMenuRef = useRef(null);
+
+      // Dark mode
+      useEffect(() => {
+        document.documentElement.setAttribute('data-dark', String(dark));
+        localStorage.setItem('pv-dark', dark);
+      }, [dark]);
+
+      // Auth: listen for session changes (login, logout, token refresh, page reload)
+      useEffect(() => {
+        if (!configured) { setAuthState('unauthenticated'); return; }
+
+        // Safety net: if loading takes more than 8 seconds, reset to login
+        const timeout = setTimeout(() => {
+          setAuthState(s => s === 'loading' ? 'unauthenticated' : s);
+        }, 8000);
+
+        const resolve = async (session) => {
+          try {
+            if (!session) {
+              setUser(null); setProfile(null); setAuthState('unauthenticated');
+              return;
+            }
+            setUser(session.user);
+            const p = await getProfile(session.user.id);
+            setProfile(p);
+            setAuthState(p?.approved ? 'authenticated' : 'pending');
+          } catch (err) {
+            // If profile fetch fails (table missing, network error, RLS),
+            // fall back gracefully — don't stay stuck on spinner
+            console.warn('PolicyVault auth error:', err);
+            if (session) {
+              setAuthState('pending'); // signed in but can't confirm approval
+            } else {
+              setUser(null); setProfile(null); setAuthState('unauthenticated');
+            }
+          }
+        };
+
+        // Check existing session on mount (handles page reloads — stays logged in)
+        db.auth.getSession().then(({ data: { session } }) => resolve(session));
+
+        // Listen for any auth event going forward
+        const { data: { subscription } } = db.auth.onAuthStateChange((_event, session) => resolve(session));
+        return () => { subscription.unsubscribe(); clearTimeout(timeout); };
+      }, []);
+
+      // Close user menu on outside click
+      useEffect(() => {
+        const h = e => { if (userMenuRef.current && !userMenuRef.current.contains(e.target)) setUserMenu(false); };
+        document.addEventListener('mousedown', h);
+        return () => document.removeEventListener('mousedown', h);
+      }, []);
+
+      // Load categories
+      const loadCats = useCallback(async () => { setCatsLoading(true); setCats(await apiGetCats()); setCatsLoading(false); }, []);
+      useEffect(() => { if (authState === 'authenticated') loadCats(); }, [authState]);
+
+      // Search (debounced)
+      const runSearch = useMemo(() => debounce(async ({ q, s }) => {
+        setListLoading(true);
+        const res = await apiSearch({ query: q, primary: s.primary || '', secondary: s.secondary || '', tertiary: s.tertiary || '' });
+        setPolicies(res); setActiveIdx(-1); setListLoading(false);
+      }, 280), []);
+
+      useEffect(() => { if (authState === 'authenticated') runSearch({ q: query, s: sel }); }, [query, sel, authState]);
+
+      // Open policy
+      const openPolicy = useCallback(async (p, idx) => {
+        if (p.id === activeId && activePolicy) return;
+        setActiveId(p.id); setActiveIdx(idx);
+        setActivePolicy(null); setDetailLoading(true);
+        setActivePolicy(await apiGetPolicy(p.id));
+        setDetailLoading(false);
+      }, [activeId, activePolicy]);
+
+      // Keyboard navigation
+      useEffect(() => {
+        if (authState !== 'authenticated') return;
+        const h = e => {
+          if (policyModal.open || usersModal) return;
+          if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+          if (e.key === 'ArrowDown') { e.preventDefault(); const n = Math.min(activeIdx + 1, policies.length - 1); if (policies[n]) openPolicy(policies[n], n); }
+          else if (e.key === 'ArrowUp') { e.preventDefault(); const n = Math.max(0, activeIdx - 1); if (policies[n]) openPolicy(policies[n], n); }
+          else if (e.key === 'Escape') { setActiveId(null); setActivePolicy(null); setActiveIdx(-1); }
+          else if ((e.metaKey || e.ctrlKey) && e.key === 'k') { e.preventDefault(); searchRef.current?.focus(); }
+          else if (e.key === 'n' && !e.metaKey && !e.ctrlKey) setPolicyModal({ open: true, mode: 'add' });
+        };
+        window.addEventListener('keydown', h);
+        return () => window.removeEventListener('keydown', h);
+      }, [authState, policyModal.open, usersModal, activeIdx, policies, openPolicy]);
+
+      const handleSavePolicy = async (saved) => {
+        setPolicyModal({ open: false, mode: 'add' });
+        await loadCats();
+        runSearch({ q: query, s: sel });
+        if (policyModal.mode === 'edit' && saved) { setActivePolicy(saved); setActiveId(saved.id); }
+      };
+
+      const handleSignOut = async () => {
+        try { await authSignOut(); } catch (e) { console.warn('Sign out error:', e); }
+        setUser(null); setProfile(null); setAuthState('unauthenticated'); setUserMenu(false);
+      };
+      const toggleDark     = () => setDark(d => !d);
+      const isAdmin        = profile?.role === 'admin';
+
+      // ── Route by auth state ────────────────────────────────────
+      if (!configured)                    return <SetupScreen />;
+      if (authState === 'loading')        return (
+        <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 16, color: 'var(--text-3)' }}>
+          <I.Spin />
+          <span style={{ fontSize: 13 }}>Loading…</span>
+          <button onClick={async () => { try { await authSignOut(); } catch(e) {} setUser(null); setProfile(null); setAuthState('unauthenticated'); }}
+            style={{ marginTop: 8, background: 'transparent', border: 'none', cursor: 'pointer', fontSize: 12, color: 'var(--text-3)', textDecoration: 'underline', fontFamily: 'var(--font-u)' }}>
+            Taking too long? Click to sign out
+          </button>
+        </div>
+      );
+      if (authState === 'unauthenticated') return <AuthPage dark={dark} onToggleDark={toggleDark} />;
+      if (authState === 'pending')         return <PendingPage profile={profile} dark={dark} onToggleDark={toggleDark} onSignOut={handleSignOut} />;
+
+      // ── Main app (authenticated + approved) ────────────────────
+      return (
+        <div style={{ height: '100vh', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+
+          {/* Header */}
+          <header style={{ height: 'var(--header-h)', display: 'flex', alignItems: 'center', padding: '0 14px', borderBottom: '1px solid var(--border)', background: 'var(--surface)', flexShrink: 0, gap: 10 }}>
+            <h1 style={{ fontFamily: 'var(--font-d)', fontSize: 21, fontWeight: 600, letterSpacing: '-0.02em', lineHeight: 1, flexShrink: 0 }}>PolicyVault</h1>
+
+            <div style={{ flex: 1, maxWidth: 540, position: 'relative', display: 'flex', alignItems: 'center' }}>
+              <span style={{ position: 'absolute', left: 10, color: 'var(--text-3)', display: 'flex', pointerEvents: 'none' }}><I.Search /></span>
+              <input ref={searchRef} type="text" placeholder="Search by name, keyword or phrase… (⌘K)" value={query} onChange={e => setQuery(e.target.value)}
+                style={{ width: '100%', padding: '7px 32px 7px 32px', border: '1px solid var(--border-2)', borderRadius: 'var(--r)', background: 'var(--bg)', color: 'var(--text)', fontFamily: 'var(--font-u)', fontSize: 13, outline: 'none', transition: 'border-color 0.15s' }}
+                onFocus={e => e.target.style.borderColor = 'var(--accent)'}
+                onBlur={e => e.target.style.borderColor = 'var(--border-2)'} />
+              {query && <button onClick={() => setQuery('')} style={{ position: 'absolute', right: 8, background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-3)', display: 'flex', padding: 2, borderRadius: 'var(--r)' }}><I.X /></button>}
+            </div>
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginLeft: 'auto', flexShrink: 0 }}>
+              <button onClick={toggleDark} title={dark ? 'Light mode' : 'Dark mode'}
+                style={{ background: 'transparent', border: '1px solid var(--border-2)', cursor: 'pointer', color: 'var(--text-2)', display: 'flex', alignItems: 'center', justifyContent: 'center', width: 30, height: 30, borderRadius: 'var(--r)' }}
+                onMouseEnter={e => e.currentTarget.style.background = 'var(--surface-2)'}
+                onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+                {dark ? <I.Sun /> : <I.Moon />}
+              </button>
+
+              <Btn variant="primary" size="sm" onClick={() => setPolicyModal({ open: true, mode: 'add' })}><I.Plus /> New Policy</Btn>
+
+              {/* User avatar + dropdown */}
+              <div ref={userMenuRef} style={{ position: 'relative' }}>
+                <button onClick={() => setUserMenu(v => !v)} title={profile?.email}
+                  style={{ width: 30, height: 30, borderRadius: '50%', background: isAdmin ? 'var(--accent-bg)' : 'var(--surface-2)', border: `1px solid ${isAdmin ? 'var(--accent)' : 'var(--border-2)'}`, color: isAdmin ? 'var(--accent)' : 'var(--text-2)', cursor: 'pointer', fontSize: 11, fontWeight: 600, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'var(--font-u)' }}>
+                  {initials(profile?.email)}
+                </button>
+
+                {userMenu && (
+                  <div className="slide-up" style={{ position: 'absolute', right: 0, top: 'calc(100% + 6px)', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--r-lg)', minWidth: 200, boxShadow: '0 8px 30px rgba(0,0,0,0.12)', zIndex: 100, overflow: 'hidden' }}>
+                    <div style={{ padding: '12px 14px', borderBottom: '1px solid var(--border)' }}>
+                      <div style={{ fontSize: 13, fontWeight: 500, marginBottom: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{profile?.email}</div>
+                      <div style={{ fontSize: 11, color: 'var(--text-3)', display: 'flex', alignItems: 'center', gap: 4 }}>
+                        {isAdmin ? <><I.Shield /><span>Administrator</span></> : <span>User</span>}
+                      </div>
+                    </div>
+
+                    {isAdmin && (
+                      <button onClick={() => { setUsersModal(true); setUserMenu(false); }}
+                        style={{ width: '100%', textAlign: 'left', padding: '9px 14px', background: 'transparent', border: 'none', cursor: 'pointer', fontSize: 13, color: 'var(--text)', display: 'flex', alignItems: 'center', gap: 8, fontFamily: 'var(--font-u)', borderBottom: '1px solid var(--border)' }}
+                        onMouseEnter={e => e.currentTarget.style.background = 'var(--surface-2)'}
+                        onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+                        <I.Users /> Manage Users
+                      </button>
+                    )}
+
+                    <button onClick={handleSignOut}
+                      style={{ width: '100%', textAlign: 'left', padding: '9px 14px', background: 'transparent', border: 'none', cursor: 'pointer', fontSize: 13, color: 'var(--danger)', display: 'flex', alignItems: 'center', gap: 8, fontFamily: 'var(--font-u)' }}
+                      onMouseEnter={e => e.currentTarget.style.background = 'var(--danger-bg)'}
+                      onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+                      <I.LogOut /> Sign Out
+                    </button>
+                  </div>
+                )}
+              </div>
+            </div>
+          </header>
+
+          {/* Body */}
+          <div style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
+            <Sidebar cats={cats} sel={sel} onSelect={ns => { setSel(ns); setActiveId(null); setActivePolicy(null); setActiveIdx(-1); }} loading={catsLoading} />
+
+            <div style={{ width: 'var(--list-w)', minWidth: 'var(--list-w)', borderRight: '1px solid var(--border)', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+              <div style={{ padding: '8px 16px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
+                <span style={{ fontSize: 11, color: 'var(--text-3)', fontWeight: 500 }}>{listLoading ? 'Searching…' : `${policies.length} ${policies.length === 1 ? 'policy' : 'policies'}`}</span>
+                {query && <span style={{ fontSize: 11, color: 'var(--accent)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 140 }}>"{query}"</span>}
+              </div>
+              <PolicyList policies={policies} selectedId={activeId} onSelect={openPolicy} loading={listLoading} query={query} />
+              {policies.length > 1 && (
+                <div style={{ padding: '6px 16px', borderTop: '1px solid var(--border)', display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
+                  <I.Kbd k="↑" /><I.Kbd k="↓" /><span style={{ fontSize: 11, color: 'var(--text-3)' }}>navigate</span>
+                </div>
+              )}
+            </div>
+
+            <div style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
+              <PolicyDetail policy={activePolicy} loading={detailLoading} onEdit={() => setPolicyModal({ open: true, mode: 'edit' })} />
+            </div>
+          </div>
+
+          <PolicyModal open={policyModal.open} mode={policyModal.mode} editPolicy={policyModal.mode === 'edit' ? activePolicy : null} cats={cats} onSave={handleSavePolicy} onClose={() => setPolicyModal(m => ({ ...m, open: false }))} />
+          <UserManagementModal open={usersModal} currentUserId={user?.id} onClose={() => setUsersModal(false)} />
+        </div>
+      );
+    }
+
+    ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => navigator.serviceWorker.register('/sw.js').catch(console.warn));
+    }
+  </script>
+</body>
+</html>
