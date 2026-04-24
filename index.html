@@ -204,19 +204,19 @@
     const META_START = '__PV_META_START__';
     const META_END   = '__PV_META_END__';
     const parseContent = (raw) => {
-      if (!raw) return { date: '', roles: '', author_name: '', author_role: '', body: '' };
+      if (!raw) return { date: '', roles: '', author_name: '', author_role: '', series: [], body: '' };
       const s = raw.indexOf(META_START), e = raw.indexOf(META_END);
       if (s === 0 && e > 0) {
         try {
           const meta = JSON.parse(raw.slice(META_START.length, e));
           const body = raw.slice(e + META_END.length).replace(/^\n/, '');
-          return { ...meta, body };
+          return { ...meta, series: meta.series || [], body };
         } catch {}
       }
-      return { date: '', roles: '', author_name: '', author_role: '', body: raw };
+      return { date: '', roles: '', author_name: '', author_role: '', series: [], body: raw };
     };
-    const serializeContent = ({ date, roles, author_name, author_role, body }) => {
-      const meta = JSON.stringify({ date: date.trim(), roles: roles.trim(), author_name: author_name.trim(), author_role: author_role.trim() });
+    const serializeContent = ({ date, roles, author_name, author_role, series, body }) => {
+      const meta = JSON.stringify({ date: date.trim(), roles: roles.trim(), author_name: author_name.trim(), author_role: author_role.trim(), series: series || [] });
       return `${META_START}${meta}${META_END}\n${body}`;
     };
 
@@ -310,7 +310,7 @@
       if (!db) return [];
       const { data } = await db
         .from('policy_references')
-        .select('order_index, referenced_policy:referenced_policy_id(id, name, primary_category, secondary_category)')
+        .select('order_index, referenced_policy:referenced_policy_id(id, name, primary_category, secondary_category, content)')
         .eq('policy_id', policyId)
         .order('order_index');
       return (data || []).map(d => d.referenced_policy).filter(Boolean);
@@ -717,49 +717,62 @@
             {(() => { const m = parseContent(policy.content); return (
               <>
                 <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
-                  {m.date && <p style={{ fontSize: 12, color: 'var(--text-3)', letterSpacing: '0.08em', textTransform: 'uppercase', fontWeight: 600 }}>Policy of {m.date}</p>}
+                  {m.date && <p style={{ fontSize: 15, color: 'var(--text-3)', letterSpacing: '0.08em', textTransform: 'uppercase', fontWeight: 600 }}>Policy of {m.date}</p>}
                 </div>
 
-                {/* Roles (left) + Series listing (centre) — two column row */}
-                {(m.roles || policy.primary_category) && (
-                  <div style={{ display: 'flex', gap: '3rem', marginBottom: '2.5rem', alignItems: 'flex-start' }}>
-                    {/* Left: applicable roles */}
-                    {m.roles && (
-                      <div style={{ minWidth: 160, flexShrink: 0 }}>
-                        {m.roles.split(',').map(r => r.trim()).filter(Boolean).map((r, i) => (
-                          <p key={i} style={{ fontSize: 11.5, color: 'var(--text-2)', lineHeight: 2, letterSpacing: '0.01em' }}>{r}</p>
-                        ))}
-                      </div>
-                    )}
-                    {/* Centre: series + number */}
-                    {policy.primary_category && (
-                      <div style={{ flex: 1, textAlign: 'center' }}>
-                        <p style={{ fontSize: 13, color: 'var(--text-2)', fontWeight: 500, letterSpacing: '0.02em', lineHeight: 2 }}>
-                          {policy.primary_category} Series{policy.secondary_category ? ` ${policy.secondary_category}` : ''}
-                        </p>
-                      </div>
-                    )}
+                {/* Roles left-aligned */}
+                {m.roles && (
+                  <div style={{ marginBottom: '1rem' }}>
+                    {m.roles.split(',').map(r => r.trim()).filter(Boolean).map((r, i) => (
+                      <p key={i} style={{ fontSize: 11.5, color: 'var(--text-2)', lineHeight: 2, letterSpacing: '0.01em' }}>{r}</p>
+                    ))}
                   </div>
                 )}
 
-                {/* Policy Title — large, centred */}
-                <h1 style={{ fontFamily: 'var(--font-d)', fontSize: 34, fontWeight: 500, lineHeight: 1.22, marginBottom: '2.5rem', letterSpacing: '-0.02em', textAlign: 'center' }}>{policy.name}</h1>
+                {/* Series — centred, directly above title */}
+                {(() => {
+                  const seriesEntries = (m.series && m.series.length > 0)
+                    ? m.series
+                    : (policy.primary_category ? [{ name: policy.primary_category, number: policy.secondary_category || '' }] : []);
+                  return seriesEntries.length > 0 ? (
+                    <div style={{ textAlign: 'center', marginBottom: '1.25rem' }}>
+                      {seriesEntries.map((s, i) => (
+                        <p key={i} style={{ fontSize: 13, color: 'var(--text-2)', fontWeight: 500, letterSpacing: '0.02em', lineHeight: 2 }}>
+                          {s.name} Series{s.number ? ` ${s.number}` : ''}
+                        </p>
+                      ))}
+                    </div>
+                  ) : null;
+                })()}
 
-                {/* Referenced policies */}
+                {/* Policy Title — large, centred */}
+                <h1 style={{ fontFamily: 'var(--font-d)', fontSize: 34, fontWeight: 500, lineHeight: 1.22, marginBottom: '2rem', letterSpacing: '-0.02em', textAlign: 'center' }}>{policy.name}</h1>
+
+                {/* Referenced policies — plain text, below title, above body */}
                 {refsLoading && (
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: 'var(--text-3)', fontSize: 12, marginBottom: '2rem' }}><I.Spin /> Loading references…</div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: 'var(--text-3)', fontSize: 12, marginBottom: '1.5rem' }}><I.Spin /> Loading references…</div>
                 )}
                 {!refsLoading && refs.length > 0 && (
-                  <div style={{ marginBottom: '2rem', padding: '16px 20px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--r-lg)', display: 'flex', flexDirection: 'column', gap: 8 }}>
-                    {refs.map((ref, i) => (
-                      <div key={ref.id} style={{ display: 'flex', alignItems: 'baseline', gap: 10 }}>
-                        <span style={{ fontSize: 11.5, color: 'var(--text-3)', fontWeight: 600, whiteSpace: 'nowrap', minWidth: 170 }}>Referenced Policy ({i + 1}):</span>
-                        <button onClick={() => onNavigate && onNavigate(ref)}
-                          style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--accent)', fontSize: 13.5, fontWeight: 500, textAlign: 'left', fontFamily: 'var(--font-u)', padding: 0, textDecoration: 'underline', textDecorationStyle: 'dotted', textUnderlineOffset: 3, lineHeight: 1.5 }}>
-                          {ref.name}
-                        </button>
-                      </div>
-                    ))}
+                  <div style={{ marginBottom: '2rem' }}>
+                    <p style={{ fontSize: 11.5, color: 'var(--text-2)', fontWeight: 600, marginBottom: '0.5rem', letterSpacing: '0.01em' }}>Referenced policies:</p>
+                    {refs.map((ref) => {
+                      const rm = parseContent(ref.content || '');
+                      const seriesLabel = ref.primary_category
+                        ? `${ref.primary_category} Series${ref.secondary_category ? ` ${ref.secondary_category}` : ''}`
+                        : '';
+                      return (
+                        <div key={ref.id} style={{ marginBottom: '0.6rem' }}>
+                          <p style={{ fontSize: 11.5, color: 'var(--text-2)', lineHeight: 1.6 }}>
+                            {rm.date && <span style={{ marginRight: '2rem' }}>{rm.date}</span>}
+                            {seriesLabel && <span>{seriesLabel}</span>}
+                          </p>
+                          <button onClick={() => onNavigate && onNavigate(ref)}
+                            style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-2)', fontSize: 11.5, fontWeight: 400, textAlign: 'left', fontFamily: 'var(--font-u)', padding: 0, paddingLeft: '2rem', lineHeight: 1.6 }}>
+                            {ref.name}
+                          </button>
+                        </div>
+                      );
+                    })}
                   </div>
                 )}
 
@@ -768,7 +781,7 @@
 
                 {/* Author — right margin */}
                 {(m.author_name || m.author_role) && (
-                  <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '1rem', paddingTop: '1.5rem', borderTop: '1px solid var(--border)' }}>
+                  <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '1rem', paddingTop: '1.5rem' }}>
                     <div style={{ textAlign: 'right' }}>
                       {m.author_name && <p style={{ fontSize: 14, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--text)', lineHeight: 1.4 }}>{m.author_name}</p>}
                       {m.author_role && <p style={{ fontSize: 11.5, fontWeight: 600, letterSpacing: '0.09em', textTransform: 'uppercase', color: 'var(--text-2)', marginTop: 3 }}>{m.author_role}</p>}
@@ -879,7 +892,7 @@
     };
 
     const PolicyModal = ({ open, mode, editPolicy, cats, onSave, onClose }) => {
-      const blank = { name: '', body: '', series_name: '', series_number: '', date: '', roles: '', author_name: '', author_role: '' };
+      const blank = { name: '', body: '', series_entries: [{ name: '', number: '' }], date: '', roles: '', author_name: '', author_role: '' };
       const [form, setForm] = useState(blank);
       const [refs, setRefs] = useState([]);
       const [saving, setSaving] = useState(false);
@@ -890,10 +903,12 @@
         if (!open) return;
         if (mode === 'edit' && editPolicy) {
           const m = parseContent(editPolicy.content || '');
+          const series_entries = (m.series && m.series.length > 0)
+            ? m.series
+            : [{ name: editPolicy.primary_category || '', number: editPolicy.secondary_category || '' }];
           setForm({
             name:         editPolicy.name || '',
-            series_name:  editPolicy.primary_category || '',
-            series_number: editPolicy.secondary_category || '',
+            series_entries,
             date:         m.date || '',
             roles:        m.roles || '',
             author_name:  m.author_name || '',
@@ -911,15 +926,15 @@
 
       const f = k => e => setForm(p => ({ ...p, [k]: e.target.value }));
       const save = async () => {
-        if (!form.name.trim())        { setErr('Policy title is required.'); return; }
-        if (!form.series_name.trim()) { setErr('Series name is required.'); return; }
-        if (!form.body.trim())        { setErr('Policy content is required.'); return; }
+        if (!form.name.trim())                          { setErr('Policy title is required.'); return; }
+        if (!form.series_entries[0]?.name?.trim())      { setErr('Series name is required.'); return; }
+        if (!form.body.trim())                          { setErr('Policy content is required.'); return; }
         setSaving(true); setErr('');
         const dbForm = {
           name:               form.name.trim(),
-          content:            serializeContent({ date: form.date, roles: form.roles, author_name: form.author_name, author_role: form.author_role, body: form.body }),
-          primary_category:   form.series_name.trim(),
-          secondary_category: form.series_number.trim() || null,
+          content:            serializeContent({ date: form.date, roles: form.roles, author_name: form.author_name, author_role: form.author_role, series: form.series_entries, body: form.body }),
+          primary_category:   form.series_entries[0]?.name?.trim() || '',
+          secondary_category: form.series_entries[0]?.number?.trim() || null,
           tertiary_category:  null,
         };
         const { data, error } = await apiSave(dbForm, mode === 'edit' ? editPolicy.id : null);
@@ -968,16 +983,40 @@
 
               {/* 3. Series */}
               {sectionDivider('Series')}
-              <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 14 }}>
-                <div>
-                  <label style={lbl}>Series Name *</label>
-                  <input className="form-input" style={inp} list="pv-series" value={form.series_name} onChange={f('series_name')} placeholder="e.g. Finance" />
-                  <datalist id="pv-series">{cats.primaries.map(c => <option key={c} value={c} />)}</datalist>
+              {form.series_entries.map((entry, idx) => (
+                <div key={idx} style={{ display: 'grid', gridTemplateColumns: '2fr 1fr auto', gap: 10, alignItems: 'flex-end' }}>
+                  <div>
+                    {idx === 0 && <label style={lbl}>Series Name *</label>}
+                    <input className="form-input" style={inp} list="pv-series" value={entry.name}
+                      onChange={e => setForm(p => { const s = [...p.series_entries]; s[idx] = { ...s[idx], name: e.target.value }; return { ...p, series_entries: s }; })}
+                      placeholder="e.g. Finance" />
+                    <datalist id="pv-series">{cats.primaries.map(c => <option key={c} value={c} />)}</datalist>
+                  </div>
+                  <div>
+                    {idx === 0 && <label style={lbl}>Series Number</label>}
+                    <input className="form-input" style={inp} value={entry.number}
+                      onChange={e => setForm(p => { const s = [...p.series_entries]; s[idx] = { ...s[idx], number: e.target.value }; return { ...p, series_entries: s }; })}
+                      placeholder="e.g. 6" />
+                  </div>
+                  <div style={{ paddingBottom: 1 }}>
+                    {form.series_entries.length > 1 && (
+                      <button type="button" onClick={() => setForm(p => ({ ...p, series_entries: p.series_entries.filter((_, i) => i !== idx) }))}
+                        style={{ background: 'transparent', border: '1px solid var(--border-2)', borderRadius: 'var(--r)', cursor: 'pointer', color: 'var(--text-3)', display: 'flex', alignItems: 'center', justifyContent: 'center', width: 32, height: 32, transition: 'all 0.15s' }}
+                        onMouseEnter={e => { e.currentTarget.style.color = 'var(--danger)'; e.currentTarget.style.borderColor = 'var(--danger)'; }}
+                        onMouseLeave={e => { e.currentTarget.style.color = 'var(--text-3)'; e.currentTarget.style.borderColor = 'var(--border-2)'; }}>
+                        <I.X />
+                      </button>
+                    )}
+                  </div>
                 </div>
-                <div>
-                  <label style={lbl}>Series Number</label>
-                  <input className="form-input" style={inp} value={form.series_number} onChange={f('series_number')} placeholder="e.g. 6" />
-                </div>
+              ))}
+              <div>
+                <button type="button" onClick={() => setForm(p => ({ ...p, series_entries: [...p.series_entries, { name: '', number: '' }] }))}
+                  style={{ background: 'transparent', border: '1px dashed var(--border-2)', borderRadius: 'var(--r)', cursor: 'pointer', color: 'var(--text-3)', display: 'inline-flex', alignItems: 'center', gap: 6, padding: '6px 12px', fontSize: 12, fontFamily: 'var(--font-u)', transition: 'all 0.15s' }}
+                  onMouseEnter={e => { e.currentTarget.style.color = 'var(--accent)'; e.currentTarget.style.borderColor = 'var(--accent)'; }}
+                  onMouseLeave={e => { e.currentTarget.style.color = 'var(--text-3)'; e.currentTarget.style.borderColor = 'var(--border-2)'; }}>
+                  <I.Plus /> Add another series
+                </button>
               </div>
 
               {/* 4. Policy Title */}
