@@ -771,13 +771,15 @@
                           : '';
                         const refType = m.ref_types?.[ref.id] || '';
                         return (
-                          <div key={ref.id} style={{ display: 'grid', gridTemplateColumns: '100px 110px 1fr', columnGap: '3rem', marginBottom: '0.15rem' }}>
-                            {/* Row 1: type (fixed width) | date (right-aligned) | series */}
+                          <div key={ref.id} style={{ display: 'grid', gridTemplateColumns: '100px 1.5rem 110px 3rem 1fr', columnGap: 0, marginBottom: '0.15rem' }}>
+                            {/* Row 1: type | gap | date (right-aligned) | gap | series */}
                             <span style={{ fontSize: 13, color: 'var(--text-2)', lineHeight: 1.7, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{refType}</span>
+                            <span />
                             <span style={{ fontSize: 13, color: 'var(--text-2)', textAlign: 'right', lineHeight: 1.7 }}>{rm.date || ''}</span>
+                            <span />
                             <span style={{ fontSize: 13, color: 'var(--text-2)', lineHeight: 1.7 }}>{seriesLabel}</span>
-                            {/* Row 2: empty | empty | policy name (clickable) */}
-                            <span /><span />
+                            {/* Row 2: empty×4 | policy name (clickable) */}
+                            <span /><span /><span /><span />
                             <button onClick={() => onNavigate && onNavigate(ref)}
                               style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-2)', fontSize: 13, fontWeight: 400, textAlign: 'left', fontFamily: 'var(--font-u)', padding: 0, lineHeight: 1.7, marginBottom: '0.5rem' }}>
                               {ref.name}
@@ -815,6 +817,8 @@
       const [search, setSearch]         = useState('');
       const [results, setResults]       = useState([]);
       const [searching, setSearching]   = useState(false);
+      const [dragIdx, setDragIdx]       = useState(null);
+      const [dragOver, setDragOver]     = useState(null);
       const searchRef = useRef(null);
 
       const doSearch = useMemo(() => debounce(async (q) => {
@@ -841,9 +845,21 @@
         <div>
           <label style={lbl}>Referenced Policies</label>
 
-          {/* List of added refs — type input | policy name | × */}
+          {/* List of added refs — drag handle | type input | policy name | × */}
           {value.map((ref, idx) => (
-            <div key={ref.id} style={{ display: 'grid', gridTemplateColumns: '110px 1fr auto', gap: 10, alignItems: 'center', marginBottom: 8 }}>
+            <div key={ref.id}
+              draggable
+              onDragStart={e => { setDragIdx(idx); e.dataTransfer.effectAllowed = 'move'; }}
+              onDragOver={e => { e.preventDefault(); setDragOver(idx); }}
+              onDrop={e => {
+                e.preventDefault();
+                if (dragIdx === null || dragIdx === idx) { setDragIdx(null); setDragOver(null); return; }
+                const next = [...value]; const [item] = next.splice(dragIdx, 1); next.splice(idx, 0, item);
+                onChange(next); setDragIdx(null); setDragOver(null);
+              }}
+              onDragEnd={() => { setDragIdx(null); setDragOver(null); }}
+              style={{ display: 'grid', gridTemplateColumns: 'auto 110px 1fr auto', gap: 10, alignItems: 'center', marginBottom: 8, opacity: dragIdx === idx ? 0.35 : 1, background: dragOver === idx ? 'var(--accent-muted)' : 'transparent', borderRadius: 'var(--r)', transition: 'background 0.1s', cursor: 'grab' }}>
+              <span style={{ color: 'var(--text-3)', display: 'flex', alignItems: 'center' }}><I.Grip /></span>
               <input
                 className="form-input"
                 value={refTypes[ref.id] || ''}
@@ -916,13 +932,15 @@
 
     const PolicyModal = ({ open, mode, editPolicy, cats, onSave, onClose }) => {
       const blank = { name: '', body: '', series_entries: [{ name: '', number: '' }], date: '', issue: 0, roles: '', author_name: '', author_role: '' };
-      const [form, setForm]       = useState(blank);
-      const [refs, setRefs]       = useState([]);
+      const [form, setForm]         = useState(blank);
+      const [refs, setRefs]         = useState([]);
       const [refTypes, setRefTypes] = useState({});
       const [showIssue, setShowIssue] = useState(false);
       const [issueInput, setIssueInput] = useState('');
-      const [saving, setSaving]   = useState(false);
-      const [err, setErr]         = useState('');
+      const [saving, setSaving]     = useState(false);
+      const [err, setErr]           = useState('');
+      const [sDragIdx, setSDragIdx] = useState(null);
+      const [sDragOver, setSDragOver] = useState(null);
       const nameRef = useRef(null);
 
       useEffect(() => {
@@ -1068,10 +1086,25 @@
                 <p style={{ fontSize: 11, color: 'var(--text-3)', marginTop: 5 }}>Comma-separated list — displayed in the left margin</p>
               </div>
 
-              {/* 3. Series */}
+              {/* 3. Series — drag to reorder */}
               {sectionDivider('Series')}
               {form.series_entries.map((entry, idx) => (
-                <div key={idx} style={{ display: 'grid', gridTemplateColumns: '2fr 1fr auto', gap: 10, alignItems: 'flex-end' }}>
+                <div key={idx}
+                  draggable
+                  onDragStart={e => { setSDragIdx(idx); e.dataTransfer.effectAllowed = 'move'; }}
+                  onDragOver={e => { e.preventDefault(); setSDragOver(idx); }}
+                  onDrop={e => {
+                    e.preventDefault();
+                    if (sDragIdx === null || sDragIdx === idx) { setSDragIdx(null); setSDragOver(null); return; }
+                    const next = [...form.series_entries];
+                    const [item] = next.splice(sDragIdx, 1);
+                    next.splice(idx, 0, item);
+                    setForm(p => ({ ...p, series_entries: next }));
+                    setSDragIdx(null); setSDragOver(null);
+                  }}
+                  onDragEnd={() => { setSDragIdx(null); setSDragOver(null); }}
+                  style={{ display: 'grid', gridTemplateColumns: 'auto 2fr 1fr auto', gap: 10, alignItems: 'flex-end', opacity: sDragIdx === idx ? 0.35 : 1, background: sDragOver === idx ? 'var(--accent-muted)' : 'transparent', borderRadius: 'var(--r)', transition: 'background 0.1s' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', paddingBottom: 2, cursor: 'grab', color: 'var(--text-3)' }}><I.Grip /></div>
                   <div>
                     {idx === 0 && <label style={lbl}>Series Name *</label>}
                     <input className="form-input" style={inp} list="pv-series" value={entry.name}
