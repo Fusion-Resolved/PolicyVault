@@ -1139,7 +1139,16 @@
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
                 <div>
                   <label style={lbl}>Policy Date</label>
-                  <input className="form-input" type="date" style={inp} value={form.date} onChange={e => setForm(p => ({ ...p, date: e.target.value }))} />
+                  <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+                    <input className="form-input" type="date" style={{ ...inp, paddingRight: 70 }} value={form.date} onChange={e => setForm(p => ({ ...p, date: e.target.value }))} />
+                    <button type="button"
+                      onClick={() => setForm(p => ({ ...p, date: new Date().toISOString().split('T')[0] }))}
+                      style={{ position: 'absolute', right: 8, background: 'var(--surface-2)', border: '1px solid var(--border-2)', borderRadius: 'calc(var(--r) - 2px)', cursor: 'pointer', color: 'var(--text-2)', fontSize: 10.5, fontWeight: 600, fontFamily: 'var(--font-u)', padding: '3px 7px', whiteSpace: 'nowrap', transition: 'all 0.15s', letterSpacing: '0.02em' }}
+                      onMouseEnter={e => { e.currentTarget.style.background = 'var(--accent-muted)'; e.currentTarget.style.color = 'var(--accent)'; e.currentTarget.style.borderColor = 'var(--accent)'; }}
+                      onMouseLeave={e => { e.currentTarget.style.background = 'var(--surface-2)'; e.currentTarget.style.color = 'var(--text-2)'; e.currentTarget.style.borderColor = 'var(--border-2)'; }}>
+                      Today
+                    </button>
+                  </div>
                 </div>
                 <div>
                   <label style={lbl}>Document Type</label>
