@@ -135,6 +135,7 @@
     .btn-icon:hover        { background: var(--surface-2) !important; }
     .sidebar-row:hover     { background: var(--surface-2) !important; color: var(--text) !important; }
     .policy-item:hover     { background: var(--surface-2) !important; }
+    .policy-item:hover .policy-dots { opacity: 1 !important; }
     .menu-item:hover       { background: var(--surface-2) !important; }
     .menu-item-danger:hover { background: var(--danger-bg) !important; }
 
@@ -182,6 +183,20 @@
     .settings-tab { transition: background 0.15s, color 0.15s; }
     .settings-tab:hover { background: var(--surface-3) !important; }
     .settings-tab.active { background: var(--surface) !important; color: var(--text) !important; box-shadow: var(--shadow-sm); }
+
+    /* Action menu dropdown */
+    .action-menu-item { width: 100%; text-align: left; padding: 9px 14px; background: transparent; border: none; cursor: pointer; font-size: 13px; color: var(--text); display: flex; align-items: center; gap: 9px; font-family: var(--font-u); transition: background 0.1s; }
+    .action-menu-item:hover { background: var(--surface-2); }
+    .action-menu-item.danger { color: var(--danger); }
+    .action-menu-item.danger:hover { background: var(--danger-bg); }
+
+    /* Expand button hover */
+    .expand-btn:hover { background: var(--surface-2) !important; }
+
+    @media print {
+      body::after { display: none; }
+      header, aside, .policy-list-col, .policy-toolbar { display: none !important; }
+    }
   </style>
 </head>
 <body>
@@ -387,6 +402,28 @@
       }
     };
 
+    const apiDelete = async (id) => {
+      if (!db) return { error: { message: 'Not connected' } };
+      return db.from('policies').delete().eq('id', id);
+    };
+
+    const apiDeleteSeries = async (primary) => {
+      if (!db) return { error: { message: 'Not connected' } };
+      return db.from('policies').delete().eq('primary_category', primary);
+    };
+
+    // ── Policy HTML generator (for export + print) ──────────────────
+    const generatePolicyHTML = (policy, refs = []) => {
+      const m = parseContent(policy.content || '');
+      const esc = s => (s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+      const css = `*{box-sizing:border-box;margin:0;padding:0}body{font-family:Georgia,serif;font-size:15px;line-height:1.9;color:#18170F;background:#FDFCF9;padding:48px 0}.wrap{max-width:680px;margin:0 auto;padding:0 40px}.meta{text-align:center;color:#5C5A54;font-size:13px;text-transform:uppercase;letter-spacing:.08em;margin-bottom:4px}.series-lbl{text-align:center;font-size:18px;color:#5C5A54;font-weight:500;margin-bottom:8px}h1{text-align:center;font-size:30px;font-weight:500;line-height:1.2;margin:1.5rem 0 2rem;letter-spacing:-.02em}.body{font-weight:300;white-space:pre-wrap;word-break:break-word}.author{text-align:right;margin-top:3rem;padding-top:2rem;border-top:1px solid #E2DED7}.aname{font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:.1em}.arole{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.09em;color:#5C5A54;margin-top:4px}.refs{margin-bottom:2rem}.refs-lbl{font-size:13px;font-weight:700;margin-bottom:8px}.ref-row{font-size:13px;color:#5C5A54;margin-bottom:3px}@media print{body{background:white}}`;
+      const series = (m.series?.length > 0 ? m.series : (policy.primary_category ? [{ name: policy.primary_category, number: policy.secondary_category || '' }] : [])).map(s => `<div class="series-lbl">${esc(s.name)} Series${s.number ? ` ${s.number}` : ''}</div>`).join('');
+      const refsHtml = refs.length > 0 ? `<div class="refs"><div class="refs-lbl">Related Policies:</div>${refs.map(r => { const rm = parseContent(r.content||''); return `<div class="ref-row">${esc(m.ref_types?.[r.id]||'')} ${esc(displayDate(rm.date)||'')} ${esc(r.name)}</div>`; }).join('')}</div>` : '';
+      const metaHtml = [m.date ? `<div class="meta">${esc(stripOf(m.doc_prefix||'Policy'))} of ${esc(displayDate(m.date))}</div>` : '', m.issue > 0 ? `<div class="meta">Issue ${toRoman(m.issue)}</div>` : ''].join('');
+      const authorHtml = (m.author_name || m.author_role) ? `<div class="author">${m.author_name ? `<div class="aname">${esc(m.author_name)}</div>` : ''}${m.author_role ? `<div class="arole">${esc(m.author_role)}</div>` : ''}</div>` : '';
+      return `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><title>${esc(policy.name)}</title><style>${css}</style></head><body><div class="wrap">${metaHtml}${series}<h1>${esc(policy.name)}</h1>${refsHtml}<div class="body">${esc(m.body)}</div>${authorHtml}</div></body></html>`;
+    };
+
     // ══════════════════════════════════════════════════════════════
     //  ICONS
     // ══════════════════════════════════════════════════════════════
@@ -413,6 +450,13 @@
       Grip:    () => <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" stroke="none"><circle cx="9" cy="5" r="1.8"/><circle cx="15" cy="5" r="1.8"/><circle cx="9" cy="12" r="1.8"/><circle cx="15" cy="12" r="1.8"/><circle cx="9" cy="19" r="1.8"/><circle cx="15" cy="19" r="1.8"/></svg>,
       Link:    () => <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>,
       Settings:() => <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>,
+      Dots:    () => <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor" stroke="none"><circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/></svg>,
+      Share:   () => <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>,
+      Download:() => <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>,
+      Printer: () => <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>,
+      Trash:   () => <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>,
+      Expand:  () => <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg>,
+      Compress:() => <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><polyline points="4 14 10 14 10 20"/><polyline points="20 10 14 10 14 4"/><line x1="10" y1="14" x2="3" y2="21"/><line x1="21" y1="3" x2="14" y2="10"/></svg>,
     };
 
     // ── Button ─────────────────────────────────────────────────────
@@ -657,16 +701,217 @@
     };
 
     // ══════════════════════════════════════════════════════════════
+    //  POLICY ACTION MENU  (floating three-dot dropdown)
+    // ══════════════════════════════════════════════════════════════
+    const PolicyActionMenu = ({ policy, seriesName, anchorRect, onClose, onDelete }) => {
+      const [confirming, setConfirming] = useState(false);
+      const [deleting, setDeleting]     = useState(false);
+      const [toast, setToast]           = useState('');
+      const isSeries = !policy && !!seriesName;
+
+      const top   = Math.min(anchorRect.bottom + 6, window.innerHeight - 260);
+      const right = Math.max(window.innerWidth - anchorRect.right, 8);
+
+      const handleShare = async () => {
+        const title = isSeries ? `${seriesName} Series` : policy.name;
+        const text  = isSeries
+          ? `PolicyVault — ${seriesName} Series`
+          : [policy.name, policy.primary_category && `Series: ${policy.primary_category}`, policy.updated_at && `Updated: ${fmtDate(policy.updated_at)}`].filter(Boolean).join('\n');
+        try {
+          if (navigator.share) { await navigator.share({ title, text }); onClose(); }
+          else { await navigator.clipboard.writeText(text); setToast('Copied to clipboard'); setTimeout(onClose, 1100); }
+        } catch { onClose(); }
+      };
+
+      const handleExport = () => {
+        if (!policy) { onClose(); return; }
+        const html = generatePolicyHTML(policy);
+        const a    = document.createElement('a');
+        a.href     = URL.createObjectURL(new Blob([html], { type: 'text/html' }));
+        a.download = `${policy.name.replace(/[^a-z0-9]/gi, '_')}.html`;
+        a.click(); onClose();
+      };
+
+      const handlePrint = () => {
+        if (!policy) { onClose(); return; }
+        const w = window.open('', '_blank');
+        if (!w) { onClose(); return; }
+        w.document.write(generatePolicyHTML(policy));
+        w.document.close();
+        w.focus();
+        setTimeout(() => { w.print(); }, 400);
+        onClose();
+      };
+
+      const handleDelete = async () => {
+        setDeleting(true);
+        await onDelete(policy?.id || null, seriesName || null);
+        setDeleting(false);
+        onClose();
+      };
+
+      const menuBase = {
+        position: 'fixed', top, right, zIndex: 600, minWidth: 192,
+        background: 'var(--surface)', border: '1.5px solid var(--border-2)',
+        borderRadius: 'var(--r-lg)', boxShadow: 'var(--shadow-lg)', overflow: 'hidden',
+      };
+
+      return (
+        <>
+          {/* Backdrop — slight tint, clicking closes the menu */}
+          <div onClick={onClose}
+            style={{ position: 'fixed', inset: 0, zIndex: 599, background: 'rgba(0,0,0,0.07)', cursor: 'default' }} />
+          <div className="slide-up" style={menuBase}>
+            {confirming ? (
+              <div style={{ padding: '14px 16px' }}>
+                <p style={{ fontSize: 13, fontWeight: 700, color: 'var(--danger)', marginBottom: 6 }}>
+                  {isSeries ? `Delete "${seriesName}" series?` : 'Delete this policy?'}
+                </p>
+                <p style={{ fontSize: 12, color: 'var(--text-3)', lineHeight: 1.55, marginBottom: 14 }}>
+                  {isSeries ? 'All policies in this series will be permanently removed.' : 'This action cannot be undone.'}
+                </p>
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <button onClick={() => setConfirming(false)}
+                    style={{ flex: 1, padding: '7px 10px', background: 'var(--surface-2)', border: '1px solid var(--border-2)', borderRadius: 'var(--r)', cursor: 'pointer', fontSize: 12, fontWeight: 600, color: 'var(--text-2)', fontFamily: 'var(--font-u)' }}>
+                    Cancel
+                  </button>
+                  <button onClick={handleDelete} disabled={deleting}
+                    style={{ flex: 1, padding: '7px 10px', background: 'var(--danger)', border: 'none', borderRadius: 'var(--r)', cursor: deleting ? 'not-allowed' : 'pointer', fontSize: 12, fontWeight: 700, color: '#fff', fontFamily: 'var(--font-u)', opacity: deleting ? 0.6 : 1 }}>
+                    {deleting ? 'Deleting…' : 'Delete'}
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <>
+                {toast && <div style={{ padding: '8px 14px', fontSize: 12, color: 'var(--accent)', background: 'var(--accent-bg)', borderBottom: '1px solid var(--border)' }}>{toast}</div>}
+                <button onClick={handleShare} className="action-menu-item">
+                  <I.Share /> Share
+                </button>
+                {!isSeries && <button onClick={handleExport} className="action-menu-item"><I.Download /> Export</button>}
+                {!isSeries && <button onClick={handlePrint} className="action-menu-item"><I.Printer /> Print</button>}
+                <div style={{ height: 1, background: 'var(--border)' }} />
+                <button onClick={() => setConfirming(true)} className="action-menu-item danger">
+                  <I.Trash /> Delete {isSeries ? 'Series' : 'Policy'}
+                </button>
+              </>
+            )}
+          </div>
+        </>
+      );
+    };
+
+    // ══════════════════════════════════════════════════════════════
+    //  POLICY DOC CONTENT  (shared renderer for detail + expand)
+    // ══════════════════════════════════════════════════════════════
+    const PolicyDocContent = ({ policy, refs, refsLoading, onNavigate }) => {
+      const m = parseContent(policy.content || '');
+      return (
+        <div className="policy-doc" style={{ width: '100%' }}>
+          <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
+            {m.date && <p style={{ fontSize: 15, color: 'var(--text-3)', letterSpacing: '0.08em', textTransform: 'uppercase', fontWeight: 600 }}>{stripOf(m.doc_prefix || 'Policy')} of {displayDate(m.date)}</p>}
+            {m.issue > 0 && <p style={{ fontSize: 13, color: 'var(--text-3)', fontWeight: 400, marginTop: 4, letterSpacing: '0.04em' }}>Issue {toRoman(m.issue)}</p>}
+          </div>
+          {m.roles && (
+            <div style={{ marginBottom: '1rem' }}>
+              {m.roles.split(',').map(r => r.trim()).filter(Boolean).map((r, i) => (
+                <p key={i} style={{ fontSize: 11.5, color: 'var(--text-2)', lineHeight: 2, letterSpacing: '0.01em' }}>{r}</p>
+              ))}
+            </div>
+          )}
+          {(() => {
+            const se = m.series?.length > 0 ? m.series : (policy.primary_category ? [{ name: policy.primary_category, number: policy.secondary_category || '' }] : []);
+            return se.length > 0 ? (
+              <div style={{ textAlign: 'center', marginBottom: '0.625rem' }}>
+                {se.map((s, i) => <p key={i} style={{ fontSize: 19.5, color: 'var(--text-2)', fontWeight: 500, letterSpacing: '0.02em', lineHeight: 1.5 }}>{s.name} Series{s.number ? ` ${s.number}` : ''}</p>)}
+              </div>
+            ) : null;
+          })()}
+          <h1 style={{ fontFamily: 'var(--font-policy, var(--font-d))', fontSize: 34, fontWeight: 500, lineHeight: 1.22, marginBottom: '2rem', letterSpacing: '-0.02em', textAlign: 'center' }}>{policy.name}</h1>
+          {refsLoading && <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: 'var(--text-3)', fontSize: 12, marginBottom: '1.5rem' }}><I.Spin /> Loading references…</div>}
+          {!refsLoading && refs.length > 0 && (
+            <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '1.67rem' }}>
+              <div style={{ display: 'inline-block' }}>
+                <p style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)', marginBottom: '0.4rem', marginLeft: '-3.5rem' }}>Related Policies:</p>
+                {refs.map(ref => {
+                  const rm = parseContent(ref.content || '');
+                  const sl = ref.primary_category ? `${ref.primary_category} Series${ref.secondary_category ? ` ${ref.secondary_category}` : ''}` : '';
+                  return (
+                    <div key={ref.id} style={{ display: 'grid', gridTemplateColumns: '100px 1.5rem 110px 3rem 1fr', columnGap: 0, marginBottom: '0.15rem' }}>
+                      <span style={{ fontSize: 13, color: 'var(--text-2)', lineHeight: 1.7 }}>{m.ref_types?.[ref.id] || ''}</span>
+                      <span />
+                      <span style={{ fontSize: 13, color: 'var(--text-2)', textAlign: 'right', lineHeight: 1.7 }}>{displayDate(rm.date) || ''}</span>
+                      <span />
+                      <span style={{ fontSize: 13, color: 'var(--text-2)', lineHeight: 1.7 }}>{sl}</span>
+                      <span /><span /><span /><span />
+                      <button onClick={() => onNavigate && onNavigate(ref)}
+                        style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-2)', fontSize: 13, textAlign: 'left', fontFamily: 'var(--font-policy, var(--font-d))', padding: 0, lineHeight: 1.7, marginBottom: '0.5rem' }}>
+                        {ref.name}
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+          <div className="policy-doc-size" style={{ lineHeight: 1.95, color: 'var(--policy-text-color, var(--text))', whiteSpace: 'pre-wrap', wordBreak: 'break-word', fontWeight: 300, letterSpacing: '0.01em', marginBottom: '3rem' }}>{m.body}</div>
+          {(m.author_name || m.author_role) && (
+            <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '1rem', paddingTop: '1.5rem' }}>
+              <div style={{ textAlign: 'right' }}>
+                {m.author_name && <p style={{ fontSize: 14, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--text)', lineHeight: 1.4 }}>{m.author_name}</p>}
+                {m.author_role && <p style={{ fontSize: 11.5, fontWeight: 600, letterSpacing: '0.09em', textTransform: 'uppercase', color: 'var(--text-2)', marginTop: 3 }}>{m.author_role}</p>}
+              </div>
+            </div>
+          )}
+        </div>
+      );
+    };
+
+    // ══════════════════════════════════════════════════════════════
+    //  POLICY EXPAND MODAL  (full-screen view)
+    // ══════════════════════════════════════════════════════════════
+    const PolicyExpandModal = ({ policy, refs, refsLoading, onClose, onEdit, onNavigate }) => (
+      <div onClick={e => { if (e.target === e.currentTarget) onClose(); }}
+        style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.55)', zIndex: 400, display: 'flex', alignItems: 'stretch', backdropFilter: 'blur(10px)', WebkitBackdropFilter: 'blur(10px)', padding: '1.5rem' }}>
+        <div className="fade-in" style={{ flex: 1, background: 'var(--surface)', borderRadius: 'var(--r-lg)', display: 'flex', flexDirection: 'column', overflow: 'hidden', boxShadow: 'var(--shadow-lg)', border: '1.5px solid var(--border-2)' }}>
+          <div className="policy-toolbar" style={{ padding: '10px 24px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0, background: 'var(--surface)' }}>
+            <span style={{ fontSize: 11, color: 'var(--text-3)', fontWeight: 600, letterSpacing: '0.06em', textTransform: 'uppercase' }}>Full View</span>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <Btn variant="default" size="sm" onClick={onEdit}><I.Edit /> Edit</Btn>
+              <button onClick={onClose} title="Collapse" className="expand-btn"
+                style={{ background: 'transparent', border: '1px solid var(--border-2)', cursor: 'pointer', color: 'var(--text-2)', display: 'flex', alignItems: 'center', justifyContent: 'center', width: 32, height: 32, borderRadius: 'var(--r)', transition: 'all 0.15s' }}>
+                <I.Compress />
+              </button>
+            </div>
+          </div>
+          <div style={{ flex: 1, overflowY: 'auto', display: 'flex', justifyContent: 'center', padding: '3rem 3.5rem' }}>
+            <div style={{ width: '100%', maxWidth: 860 }}>
+              <PolicyDocContent policy={policy} refs={refs} refsLoading={refsLoading} onNavigate={onNavigate} />
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+
+    // ══════════════════════════════════════════════════════════════
     //  POLICY COMPONENTS
     // ══════════════════════════════════════════════════════════════
-    const Sidebar = ({ cats, sel, onSelect, loading }) => {
-      const [openP, setOpenP] = useState({});
-      const [openS, setOpenS] = useState({});
+    const Sidebar = ({ cats, sel, onSelect, loading, onDeleteSeries }) => {
+      const [actionMenu, setActionMenu] = useState(null); // { seriesName, rect }
 
-      const rowStyle = (active) => ({ width: '100%', textAlign: 'left', padding: '6px 10px 6px 12px', background: active ? 'var(--accent-muted)' : 'transparent', color: active ? 'var(--accent)' : 'var(--text-2)', border: 'none', cursor: 'pointer', fontSize: 12.5, fontWeight: active ? 700 : 400, borderRadius: 'var(--r)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 4, transition: 'all 0.12s', fontFamily: 'var(--font-u)' });
-      const isP = (p) => sel.primary === p && !sel.secondary;
-      const isS = (p, s) => sel.primary === p && sel.secondary === s && !sel.tertiary;
-      const isT = (p, s, t) => sel.primary === p && sel.secondary === s && sel.tertiary === t;
+      const rowStyle = (active) => ({
+        flex: 1, textAlign: 'left', padding: '7px 10px 7px 12px',
+        background: active ? 'var(--accent-muted)' : 'transparent',
+        color: active ? 'var(--accent)' : 'var(--text-2)', border: 'none',
+        cursor: 'pointer', fontSize: 12.5, fontWeight: active ? 700 : 400,
+        borderRadius: 'var(--r)', display: 'flex', alignItems: 'center',
+        gap: 7, transition: 'all 0.12s', fontFamily: 'var(--font-u)',
+      });
+
+      const openMenu = (e, seriesName) => {
+        e.stopPropagation();
+        const rect = e.currentTarget.getBoundingClientRect();
+        setActionMenu({ seriesName, rect });
+      };
 
       return (
         <aside style={{ width: 'var(--sidebar-w)', minWidth: 'var(--sidebar-w)', borderRight: '1px solid var(--border)', overflowY: 'auto', padding: '14px 8px 24px', display: 'flex', flexDirection: 'column', gap: 1 }}>
@@ -674,44 +919,57 @@
             <span>Series</span>
             <div style={{ flex: 1, height: 1, background: 'var(--border-2)' }} />
           </div>
-          <button style={rowStyle(!sel.primary)} className="sidebar-row" onClick={() => onSelect({})}>
-            <span style={{ display: 'flex', alignItems: 'center', gap: 7 }}><I.File2 /> All Policies</span>
+
+          {/* All Policies */}
+          <button style={{ ...rowStyle(!sel.primary), width: '100%' }} className="sidebar-row"
+            onClick={() => onSelect({})}>
+            <I.File2 /> All Policies
           </button>
+
           {loading
             ? <div style={{ padding: '12px 12px', color: 'var(--text-3)', fontSize: 12, display: 'flex', alignItems: 'center', gap: 6 }}><I.Spin /> Loading…</div>
             : cats.primaries.map(p => {
-                const subs = cats.byPrimary[p] || [], pOpen = openP[p];
+                const active = sel.primary === p;
                 return (
-                  <div key={p}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                      <button style={{ ...rowStyle(isP(p)), flex: 1 }} className="sidebar-row" onClick={() => { onSelect({ primary: p }); setOpenP(o => ({ ...o, [p]: true })); }}>
-                        <span style={{ display: 'flex', alignItems: 'center', gap: 7 }}><I.Folder /> {p}</span>
-                      </button>
-                      {subs.length > 0 && <button onClick={() => setOpenP(o => ({ ...o, [p]: !o[p] }))} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-3)', padding: '5px 6px', borderRadius: 'var(--r)', display: 'flex', transition: 'color 0.12s' }}>{pOpen ? <I.CDown /> : <I.CRight />}</button>}
-                    </div>
-                    {pOpen && subs.map(s => {
-                      const sk = `${p}||${s}`, terts = cats.bySecondary[sk] || [], sOpen = openS[sk];
-                      return (
-                        <div key={s} style={{ marginLeft: 16, borderLeft: '1px solid var(--border)' }}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 1, paddingLeft: 6 }}>
-                            <button style={{ ...rowStyle(isS(p, s)), flex: 1, fontSize: 12 }} className="sidebar-row" onClick={() => { onSelect({ primary: p, secondary: s }); setOpenS(o => ({ ...o, [sk]: true })); }}>Series {s}</button>
-                            {terts.length > 0 && <button onClick={() => setOpenS(o => ({ ...o, [sk]: !o[sk] }))} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-3)', padding: '5px 6px', borderRadius: 'var(--r)', display: 'flex' }}>{sOpen ? <I.CDown /> : <I.CRight />}</button>}
-                          </div>
-                          {sOpen && terts.map(t => <button key={t} style={{ ...rowStyle(isT(p, s, t)), width: 'calc(100% - 6px)', marginLeft: 6, fontSize: 11.5, paddingLeft: 10 }} className="sidebar-row" onClick={() => onSelect({ primary: p, secondary: s, tertiary: t })}>{t}</button>)}
-                        </div>
-                      );
-                    })}
+                  <div key={p} style={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                    <button style={rowStyle(active)} className="sidebar-row"
+                      onClick={() => onSelect({ primary: p })}>
+                      <I.Folder /> {p}
+                    </button>
+                    {/* Three-dot for series */}
+                    <button
+                      title="Series actions"
+                      onClick={e => openMenu(e, p)}
+                      style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-3)', padding: '5px 5px', borderRadius: 'var(--r)', display: 'flex', alignItems: 'center', flexShrink: 0, transition: 'color 0.12s, background 0.12s' }}
+                      onMouseEnter={e => { e.currentTarget.style.color = 'var(--text)'; e.currentTarget.style.background = 'var(--surface-2)'; }}
+                      onMouseLeave={e => { e.currentTarget.style.color = 'var(--text-3)'; e.currentTarget.style.background = 'transparent'; }}>
+                      <I.Dots />
+                    </button>
                   </div>
                 );
               })
           }
+
+          {actionMenu && (
+            <PolicyActionMenu
+              seriesName={actionMenu.seriesName}
+              anchorRect={actionMenu.rect}
+              onClose={() => setActionMenu(null)}
+              onDelete={async (id, series) => { await onDeleteSeries(series); setActionMenu(null); }}
+            />
+          )}
         </aside>
       );
     };
 
-    const PolicyList = ({ policies, selectedId, onSelect, loading, query }) => {
+    const PolicyList = ({ policies, selectedId, onSelect, loading, query, onDeletePolicy }) => {
       const refs = useRef({});
-      useEffect(() => { if (selectedId && refs.current[selectedId]) refs.current[selectedId].scrollIntoView({ block: 'nearest', behavior: 'smooth' }); }, [selectedId]);
+      const [actionMenu, setActionMenu] = useState(null); // { policy, rect }
+
+      useEffect(() => {
+        if (selectedId && refs.current[selectedId]) refs.current[selectedId].scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+      }, [selectedId]);
+
       if (loading) return <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-3)' }}><I.Spin /></div>;
       if (!policies.length) return (
         <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 10, color: 'var(--text-3)', padding: '2rem' }}>
@@ -719,41 +977,79 @@
           <span style={{ fontSize: 13, textAlign: 'center' }}>{query ? `No results for "${query}"` : 'No policies yet'}</span>
         </div>
       );
+
+      const openMenu = (e, policy) => {
+        e.stopPropagation();
+        const rect = e.currentTarget.getBoundingClientRect();
+        setActionMenu({ policy, rect });
+      };
+
       return (
-        <div style={{ flex: 1, overflowY: 'auto', padding: '6px 0' }}>
-          {policies.map((p) => {
-            const a = p.id === selectedId;
-            return (
-              <div key={p.id} ref={el => { refs.current[p.id] = el; }} onClick={() => onSelect(p, policies.indexOf(p))}
-                className={!a ? 'policy-item' : ''}
-                style={{ padding: '10px 16px', cursor: 'pointer', background: a ? 'var(--accent-muted)' : 'transparent', borderLeft: `2px solid ${a ? 'var(--accent)' : 'transparent'}`, transition: 'all 0.1s' }}>
-                <div style={{ fontWeight: 600, fontSize: 13, color: a ? 'var(--accent-text)' : 'var(--text)', marginBottom: 4, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{p.name}</div>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6 }}>
-                  <div style={{ fontSize: 11, color: a ? 'var(--accent)' : 'var(--text-3)', display: 'flex', alignItems: 'center', gap: 3, minWidth: 0, opacity: a ? 0.85 : 1 }}>
-                    {p.primary_category && (
-                      <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                        {p.primary_category}{p.secondary_category ? ` Series ${p.secondary_category}` : ' Series'}
-                      </span>
-                    )}
+        <>
+          <div style={{ flex: 1, overflowY: 'auto', padding: '6px 0' }}>
+            {policies.map(p => {
+              const a = p.id === selectedId;
+              return (
+                <div key={p.id} ref={el => { refs.current[p.id] = el; }}
+                  className={!a ? 'policy-item' : ''}
+                  style={{ padding: '10px 12px 10px 16px', cursor: 'pointer', background: a ? 'var(--accent-muted)' : 'transparent', borderLeft: `2px solid ${a ? 'var(--accent)' : 'transparent'}`, transition: 'all 0.1s', display: 'flex', alignItems: 'center', gap: 6 }}>
+
+                  {/* Main clickable area */}
+                  <div onClick={() => onSelect(p, policies.indexOf(p))} style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontWeight: 600, fontSize: 13, color: a ? 'var(--accent-text)' : 'var(--text)', marginBottom: 4, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{p.name}</div>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6 }}>
+                      <div style={{ fontSize: 11, color: a ? 'var(--accent)' : 'var(--text-3)', minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', opacity: a ? 0.85 : 1 }}>
+                        {p.primary_category && `${p.primary_category}${p.secondary_category ? ` Series ${p.secondary_category}` : ' Series'}`}
+                      </div>
+                      <span style={{ fontSize: 10.5, color: 'var(--text-3)', flexShrink: 0, opacity: 0.75 }}>{fmtDate(p.updated_at)}</span>
+                    </div>
                   </div>
-                  <span style={{ fontSize: 10.5, color: 'var(--text-3)', flexShrink: 0, opacity: 0.75 }}>{fmtDate(p.updated_at)}</span>
+
+                  {/* Three-dot button */}
+                  <button
+                    title="Actions"
+                    onClick={e => openMenu(e, p)}
+                    style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-3)', padding: '4px 5px', borderRadius: 'var(--r)', display: 'flex', alignItems: 'center', flexShrink: 0, transition: 'color 0.12s, background 0.12s', opacity: 0 }}
+                    className="policy-dots"
+                    onMouseEnter={e => { e.currentTarget.style.color = 'var(--text)'; e.currentTarget.style.background = 'var(--surface-3)'; e.currentTarget.style.opacity = '1'; }}
+                    onMouseLeave={e => { e.currentTarget.style.color = 'var(--text-3)'; e.currentTarget.style.background = 'transparent'; e.currentTarget.style.opacity = '0'; }}>
+                    <I.Dots />
+                  </button>
                 </div>
-              </div>
-            );
-          })}
-        </div>
+              );
+            })}
+          </div>
+
+          {actionMenu && (
+            <PolicyActionMenu
+              policy={actionMenu.policy}
+              anchorRect={actionMenu.rect}
+              onClose={() => setActionMenu(null)}
+              onDelete={async (id) => { await onDeletePolicy(id); setActionMenu(null); }}
+            />
+          )}
+        </>
       );
     };
 
     const PolicyDetail = ({ policy, loading, onEdit, onNavigate }) => {
-      const [refs, setRefs] = useState([]);
+      const [refs, setRefs]             = useState([]);
       const [refsLoading, setRefsLoading] = useState(false);
+      const [expanded, setExpanded]     = useState(false);
 
       useEffect(() => {
         if (!policy?.id) { setRefs([]); return; }
         setRefsLoading(true);
         apiGetReferences(policy.id).then(data => { setRefs(data); setRefsLoading(false); });
       }, [policy?.id]);
+
+      // Close expand on Escape
+      useEffect(() => {
+        if (!expanded) return;
+        const h = e => { if (e.key === 'Escape') setExpanded(false); };
+        window.addEventListener('keydown', h);
+        return () => window.removeEventListener('keydown', h);
+      }, [expanded]);
 
       if (loading) return <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><I.Spin /></div>;
       if (!policy) return (
@@ -765,101 +1061,34 @@
           <div style={{ fontSize: 12, display: 'flex', gap: 6, alignItems: 'center' }}><I.Kbd k="↑" /><I.Kbd k="↓" /><span style={{ color: 'var(--text-3)' }}>to navigate</span></div>
         </div>
       );
+
       return (
         <div className="fade-in" style={{ flex: 1, display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
-          <div style={{ padding: '10px 28px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'flex-end', flexShrink: 0, background: 'var(--surface)' }}>
+          {/* Toolbar */}
+          <div className="policy-toolbar" style={{ padding: '10px 28px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 8, flexShrink: 0, background: 'var(--surface)' }}>
             <Btn variant="default" size="sm" onClick={() => onEdit(policy)}><I.Edit /> Edit Policy</Btn>
+            <button onClick={() => setExpanded(true)} title="Expand to full screen" className="expand-btn"
+              style={{ background: 'transparent', border: '1px solid var(--border-2)', cursor: 'pointer', color: 'var(--text-2)', display: 'flex', alignItems: 'center', justifyContent: 'center', width: 32, height: 32, borderRadius: 'var(--r)', transition: 'all 0.15s' }}>
+              <I.Expand />
+            </button>
           </div>
-          <div style={{ flex: 1, overflowY: 'auto', padding: '3rem 3.5rem', maxWidth: 860 }} className="policy-doc">
 
-            {/* Policy Date — centre top */}
-            {(() => { const m = parseContent(policy.content); return (
-              <>
-                <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
-                  {m.date && <p style={{ fontSize: 15, color: 'var(--text-3)', letterSpacing: '0.08em', textTransform: 'uppercase', fontWeight: 600 }}>{stripOf(m.doc_prefix || 'Policy')} of {displayDate(m.date)}</p>}
-                  {m.issue > 0 && <p style={{ fontSize: 13, color: 'var(--text-3)', fontWeight: 400, marginTop: 4, letterSpacing: '0.04em' }}>Issue {toRoman(m.issue)}</p>}
-                </div>
-
-                {/* Roles left-aligned */}
-                {m.roles && (
-                  <div style={{ marginBottom: '1rem' }}>
-                    {m.roles.split(',').map(r => r.trim()).filter(Boolean).map((r, i) => (
-                      <p key={i} style={{ fontSize: 11.5, color: 'var(--text-2)', lineHeight: 2, letterSpacing: '0.01em' }}>{r}</p>
-                    ))}
-                  </div>
-                )}
-
-                {/* Series — centred, directly above title, halved gap between items */}
-                {(() => {
-                  const seriesEntries = (m.series && m.series.length > 0)
-                    ? m.series
-                    : (policy.primary_category ? [{ name: policy.primary_category, number: policy.secondary_category || '' }] : []);
-                  return seriesEntries.length > 0 ? (
-                    <div style={{ textAlign: 'center', marginBottom: '0.625rem' }}>
-                      {seriesEntries.map((s, i) => (
-                        <p key={i} style={{ fontSize: 19.5, color: 'var(--text-2)', fontWeight: 500, letterSpacing: '0.02em', lineHeight: 1.5 }}>
-                          {s.name} Series{s.number ? ` ${s.number}` : ''}
-                        </p>
-                      ))}
-                    </div>
-                  ) : null;
-                })()}
-
-                {/* Policy Title — large, centred */}
-                <h1 style={{ fontFamily: 'var(--font-policy, var(--font-d))', fontSize: 34, fontWeight: 500, lineHeight: 1.22, marginBottom: '2rem', letterSpacing: '-0.02em', textAlign: 'center' }}>{policy.name}</h1>
-
-                {/* Referenced policies — centred, fixed-width type column, label offset left */}
-                {refsLoading && (
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: 'var(--text-3)', fontSize: 12, marginBottom: '1.5rem' }}><I.Spin /> Loading references…</div>
-                )}
-                {!refsLoading && refs.length > 0 && (
-                  <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '1.67rem' }}>
-                    <div style={{ display: 'inline-block' }}>
-                      {/* Label: "Related " sits left of the type column, "Policies:" sits above it */}
-                      <p style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)', marginBottom: '0.4rem', marginLeft: '-3.5rem' }}>Related Policies:</p>
-                      {refs.map((ref) => {
-                        const rm = parseContent(ref.content || '');
-                        const seriesLabel = ref.primary_category
-                          ? `${ref.primary_category} Series${ref.secondary_category ? ` ${ref.secondary_category}` : ''}`
-                          : '';
-                        const refType = m.ref_types?.[ref.id] || '';
-                        return (
-                          <div key={ref.id} style={{ display: 'grid', gridTemplateColumns: '100px 1.5rem 110px 3rem 1fr', columnGap: 0, marginBottom: '0.15rem' }}>
-                            {/* Row 1: type | gap | date (right-aligned) | gap | series */}
-                            <span style={{ fontSize: 13, color: 'var(--text-2)', lineHeight: 1.7, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{refType}</span>
-                            <span />
-                            <span style={{ fontSize: 13, color: 'var(--text-2)', textAlign: 'right', lineHeight: 1.7 }}>{displayDate(rm.date) || ''}</span>
-                            <span />
-                            <span style={{ fontSize: 13, color: 'var(--text-2)', lineHeight: 1.7 }}>{seriesLabel}</span>
-                            {/* Row 2: empty×4 | policy name (clickable) */}
-                            <span /><span /><span /><span />
-                            <button onClick={() => onNavigate && onNavigate(ref)}
-                              style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-2)', fontSize: 13, fontWeight: 400, textAlign: 'left', fontFamily: 'var(--font-policy, var(--font-d))', padding: 0, lineHeight: 1.7, marginBottom: '0.5rem' }}>
-                              {ref.name}
-                            </button>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-                )}
-
-                {/* Body — left aligned, uniform policy font */}
-                <div className="policy-doc-size" style={{ lineHeight: 1.95, color: 'var(--policy-text-color, var(--text))', whiteSpace: 'pre-wrap', wordBreak: 'break-word', fontWeight: 300, letterSpacing: '0.01em', marginBottom: '3rem' }}>{m.body}</div>
-
-                {/* Author — right margin */}
-                {(m.author_name || m.author_role) && (
-                  <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '1rem', paddingTop: '1.5rem' }}>
-                    <div style={{ textAlign: 'right' }}>
-                      {m.author_name && <p style={{ fontSize: 14, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--text)', lineHeight: 1.4 }}>{m.author_name}</p>}
-                      {m.author_role && <p style={{ fontSize: 11.5, fontWeight: 600, letterSpacing: '0.09em', textTransform: 'uppercase', color: 'var(--text-2)', marginTop: 3 }}>{m.author_role}</p>}
-                    </div>
-                  </div>
-                )}
-              </>
-            ); })()}
-
+          {/* Scrollable content */}
+          <div style={{ flex: 1, overflowY: 'auto', padding: '3rem 3.5rem', maxWidth: 860 }}>
+            <PolicyDocContent policy={policy} refs={refs} refsLoading={refsLoading} onNavigate={onNavigate} />
           </div>
+
+          {/* Full-screen expand modal */}
+          {expanded && (
+            <PolicyExpandModal
+              policy={policy}
+              refs={refs}
+              refsLoading={refsLoading}
+              onClose={() => setExpanded(false)}
+              onEdit={() => { setExpanded(false); onEdit(policy); }}
+              onNavigate={onNavigate}
+            />
+          )}
         </div>
       );
     };
@@ -1724,6 +1953,21 @@
         }
       };
 
+      const handleDeletePolicy = async (id) => {
+        await apiDelete(id);
+        if (activeId === id) { setActiveId(null); setActivePolicy(null); setActiveIdx(-1); }
+        await loadCats();
+        runSearch({ q: query, s: sel });
+      };
+
+      const handleDeleteSeries = async (primary) => {
+        await apiDeleteSeries(primary);
+        if (activePolicy?.primary_category === primary) { setActiveId(null); setActivePolicy(null); setActiveIdx(-1); }
+        await loadCats();
+        runSearch({ q: query, s: sel });
+        if (sel.primary === primary) setSel({});
+      };
+
       const handleSignOut = async () => {
         try { await authSignOut(); } catch (e) { console.warn('Sign out error:', e); }
         setUser(null); setProfile(null); setAuthState('unauthenticated'); setUserMenu(false);
@@ -1798,13 +2042,13 @@
           </header>
 
           <div style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
-            <Sidebar cats={cats} sel={sel} onSelect={ns => { setSel(ns); setActiveId(null); setActivePolicy(null); setActiveIdx(-1); }} loading={catsLoading} />
+            <Sidebar cats={cats} sel={sel} onSelect={ns => { setSel(ns); setActiveId(null); setActivePolicy(null); setActiveIdx(-1); }} loading={catsLoading} onDeleteSeries={handleDeleteSeries} />
             <div style={{ width: 'var(--list-w)', minWidth: 'var(--list-w)', borderRight: '1px solid var(--border)', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
               <div style={{ padding: '8px 16px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
                 <span style={{ fontSize: 11, color: 'var(--text-3)', fontWeight: 700, letterSpacing: '0.04em' }}>{listLoading ? 'Searching…' : `${policies.length} ${policies.length === 1 ? 'policy' : 'policies'}`}</span>
                 {query && <span style={{ fontSize: 11, color: 'var(--accent)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 140, fontWeight: 700 }}>"{query}"</span>}
               </div>
-              <PolicyList policies={policies} selectedId={activeId} onSelect={openPolicy} loading={listLoading} query={query} />
+              <PolicyList policies={policies} selectedId={activeId} onSelect={openPolicy} loading={listLoading} query={query} onDeletePolicy={handleDeletePolicy} />
               {policies.length > 1 && (
                 <div style={{ padding: '7px 16px', borderTop: '1px solid var(--border)', display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
                   <I.Kbd k="↑" /><I.Kbd k="↓" /><span style={{ fontSize: 11, color: 'var(--text-3)' }}>navigate</span>
