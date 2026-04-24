@@ -896,8 +896,8 @@
               </button>
             </div>
           </div>
-          <div style={{ flex: 1, overflowY: 'auto', display: 'flex', justifyContent: 'center', padding: '3rem 3.5rem' }}>
-            <div style={{ width: '100%', maxWidth: 860 }}>
+          <div style={{ flex: 1, overflowY: 'auto', width: '100%' }}>
+            <div style={{ maxWidth: 900, margin: '0 auto', padding: '3rem 3.5rem' }}>
               <PolicyDocContent policy={policy} refs={refs} refsLoading={refsLoading} onNavigate={onNavigate} />
             </div>
           </div>
@@ -1090,9 +1090,11 @@
             </button>
           </div>
 
-          {/* Scrollable content */}
-          <div style={{ flex: 1, overflowY: 'auto', padding: '3rem 3.5rem', maxWidth: 860 }}>
-            <PolicyDocContent policy={policy} refs={refs} refsLoading={refsLoading} onNavigate={onNavigate} />
+          {/* Scrollable content — fills all available width, content centres itself */}
+          <div style={{ flex: 1, overflowY: 'auto', width: '100%' }}>
+            <div style={{ maxWidth: 900, margin: '0 auto', padding: '3rem 3.5rem' }}>
+              <PolicyDocContent policy={policy} refs={refs} refsLoading={refsLoading} onNavigate={onNavigate} />
+            </div>
           </div>
 
           {/* Full-screen expand modal */}
