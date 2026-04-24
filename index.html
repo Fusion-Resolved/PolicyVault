@@ -729,7 +729,7 @@
                   </div>
                 )}
 
-                {/* Series — centred, directly above title */}
+                {/* Series — centred, directly above title, doubled size */}
                 {(() => {
                   const seriesEntries = (m.series && m.series.length > 0)
                     ? m.series
@@ -737,7 +737,7 @@
                   return seriesEntries.length > 0 ? (
                     <div style={{ textAlign: 'center', marginBottom: '1.25rem' }}>
                       {seriesEntries.map((s, i) => (
-                        <p key={i} style={{ fontSize: 13, color: 'var(--text-2)', fontWeight: 500, letterSpacing: '0.02em', lineHeight: 2 }}>
+                        <p key={i} style={{ fontSize: 26, color: 'var(--text-2)', fontWeight: 500, letterSpacing: '0.02em', lineHeight: 1.7 }}>
                           {s.name} Series{s.number ? ` ${s.number}` : ''}
                         </p>
                       ))}
@@ -748,31 +748,38 @@
                 {/* Policy Title — large, centred */}
                 <h1 style={{ fontFamily: 'var(--font-d)', fontSize: 34, fontWeight: 500, lineHeight: 1.22, marginBottom: '2rem', letterSpacing: '-0.02em', textAlign: 'center' }}>{policy.name}</h1>
 
-                {/* Referenced policies — plain text, below title, above body */}
+                {/* Referenced policies — centred block, label offset left, doubled size */}
                 {refsLoading && (
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: 'var(--text-3)', fontSize: 12, marginBottom: '1.5rem' }}><I.Spin /> Loading references…</div>
                 )}
                 {!refsLoading && refs.length > 0 && (
-                  <div style={{ marginBottom: '2rem' }}>
-                    <p style={{ fontSize: 11.5, color: 'var(--text-2)', fontWeight: 600, marginBottom: '0.5rem', letterSpacing: '0.01em' }}>Referenced policies:</p>
-                    {refs.map((ref) => {
-                      const rm = parseContent(ref.content || '');
-                      const seriesLabel = ref.primary_category
-                        ? `${ref.primary_category} Series${ref.secondary_category ? ` ${ref.secondary_category}` : ''}`
-                        : '';
-                      return (
-                        <div key={ref.id} style={{ marginBottom: '0.6rem' }}>
-                          <p style={{ fontSize: 11.5, color: 'var(--text-2)', lineHeight: 1.6 }}>
-                            {rm.date && <span style={{ marginRight: '2rem' }}>{rm.date}</span>}
-                            {seriesLabel && <span>{seriesLabel}</span>}
-                          </p>
-                          <button onClick={() => onNavigate && onNavigate(ref)}
-                            style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-2)', fontSize: 11.5, fontWeight: 400, textAlign: 'left', fontFamily: 'var(--font-u)', padding: 0, paddingLeft: '2rem', lineHeight: 1.6 }}>
-                            {ref.name}
-                          </button>
-                        </div>
-                      );
-                    })}
+                  <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '2.5rem' }}>
+                    <div style={{ display: 'inline-block' }}>
+                      <p style={{ fontSize: 13, color: 'var(--text-3)', fontWeight: 600, marginBottom: '0.6rem', letterSpacing: '0.04em', textTransform: 'uppercase' }}>Referenced policies:</p>
+                      {refs.map((ref) => {
+                        const rm = parseContent(ref.content || '');
+                        const seriesLabel = ref.primary_category
+                          ? `${ref.primary_category} Series${ref.secondary_category ? ` ${ref.secondary_category}` : ''}`
+                          : '';
+                        const dateWidth = 120;
+                        return (
+                          <div key={ref.id} style={{ marginBottom: '0.9rem' }}>
+                            {/* Line 1: date + series */}
+                            <div style={{ display: 'flex', alignItems: 'baseline' }}>
+                              <span style={{ fontSize: 23, color: 'var(--text-2)', minWidth: dateWidth, flexShrink: 0, lineHeight: 1.5 }}>{rm.date || ''}</span>
+                              <span style={{ fontSize: 23, color: 'var(--text-2)', fontWeight: 500, lineHeight: 1.5 }}>{seriesLabel}</span>
+                            </div>
+                            {/* Line 2: policy name indented under series */}
+                            <div style={{ paddingLeft: dateWidth }}>
+                              <button onClick={() => onNavigate && onNavigate(ref)}
+                                style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-2)', fontSize: 23, fontWeight: 400, textAlign: 'left', fontFamily: 'var(--font-u)', padding: 0, lineHeight: 1.5 }}>
+                                {ref.name}
+                              </button>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
                   </div>
                 )}
 
@@ -796,13 +803,13 @@
       );
     };
 
-    // ── Referenced Policies Editor (drag-to-reorder) ────────────────
+    // ── Referenced Policies Editor ──────────────────────────────────
     const ReferencedPoliciesEditor = ({ currentPolicyId, value, onChange }) => {
-      const [search, setSearch]       = useState('');
-      const [results, setResults]     = useState([]);
-      const [searching, setSearching] = useState(false);
-      const [dragIdx, setDragIdx]     = useState(null);
-      const [dragOver, setDragOver]   = useState(null);
+      const [showSearch, setShowSearch] = useState(false);
+      const [search, setSearch]         = useState('');
+      const [results, setResults]       = useState([]);
+      const [searching, setSearching]   = useState(false);
+      const searchRef = useRef(null);
 
       const doSearch = useMemo(() => debounce(async (q) => {
         if (!q.trim()) { setResults([]); setSearching(false); return; }
@@ -814,77 +821,78 @@
 
       useEffect(() => { doSearch(search); }, [search]);
 
-      const add    = (p) => { onChange([...value, p]); setSearch(''); setResults([]); };
+      const add = (p) => { onChange([...value, p]); setSearch(''); setResults([]); setShowSearch(false); };
       const remove = (id) => onChange(value.filter(p => p.id !== id));
 
-      const onDragStart = (e, idx) => { setDragIdx(idx); e.dataTransfer.effectAllowed = 'move'; };
-      const onDragOver  = (e, idx) => { e.preventDefault(); if (idx !== dragOver) setDragOver(idx); };
-      const onDrop = (e, idx) => {
-        e.preventDefault();
-        if (dragIdx === null || dragIdx === idx) { setDragIdx(null); setDragOver(null); return; }
-        const next = [...value];
-        const [item] = next.splice(dragIdx, 1);
-        next.splice(idx, 0, item);
-        onChange(next);
-        setDragIdx(null);
-        setDragOver(null);
-      };
-      const onDragEnd = () => { setDragIdx(null); setDragOver(null); };
+      const openSearch = () => { setShowSearch(true); setTimeout(() => searchRef.current?.focus(), 40); };
+      const cancelSearch = () => { setShowSearch(false); setSearch(''); setResults([]); };
 
       const lbl = { fontSize: 10, fontWeight: 700, color: 'var(--text-3)', marginBottom: 8, display: 'block', textTransform: 'uppercase', letterSpacing: '0.09em' };
-      const inp = { width: '100%', padding: '8px 12px 8px 32px', border: '1px solid var(--border-2)', borderRadius: 'var(--r)', background: 'var(--bg)', color: 'var(--text)', fontFamily: 'var(--font-u)', fontSize: 13, outline: 'none', transition: 'border-color 0.15s, box-shadow 0.15s' };
+      const inp = { width: '100%', padding: '9px 12px', border: '1px solid var(--border-2)', borderRadius: 'var(--r)', background: 'var(--bg)', color: 'var(--text)', fontFamily: 'var(--font-u)', fontSize: 13, outline: 'none', transition: 'border-color 0.15s, box-shadow 0.15s' };
 
       return (
         <div>
           <label style={lbl}>Referenced Policies</label>
 
-          {value.length > 0 && (
-            <div style={{ marginBottom: 10 }}>
-              {value.map((ref, i) => (
-                <div key={ref.id}
-                  draggable
-                  onDragStart={e => onDragStart(e, i)}
-                  onDragOver={e => onDragOver(e, i)}
-                  onDrop={e => onDrop(e, i)}
-                  onDragEnd={onDragEnd}
-                  style={{ display: 'flex', alignItems: 'center', gap: 9, padding: '7px 10px', marginBottom: 6, background: dragOver === i ? 'var(--accent-muted)' : 'var(--surface-2)', border: `1px solid ${dragOver === i ? 'var(--accent)' : 'var(--border)'}`, borderRadius: 'var(--r)', cursor: 'grab', transition: 'all 0.1s', opacity: dragIdx === i ? 0.35 : 1, userSelect: 'none' }}>
-                  <span style={{ color: 'var(--text-3)', display: 'flex', flexShrink: 0 }}><I.Grip /></span>
-                  <span style={{ fontSize: 11, color: 'var(--text-3)', fontWeight: 700, minWidth: 22, flexShrink: 0 }}>({i + 1})</span>
-                  <span style={{ flex: 1, fontSize: 13, fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{ref.name}</span>
-                  {ref.primary_category && (
-                    <span style={{ fontSize: 10.5, color: 'var(--text-3)', flexShrink: 0, background: 'var(--surface-3)', padding: '2px 7px', borderRadius: 100 }}>{ref.primary_category}</span>
-                  )}
-                  <button onClick={() => remove(ref.id)}
-                    style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-3)', display: 'flex', padding: 2, borderRadius: 4, flexShrink: 0 }}
-                    onMouseEnter={e => e.currentTarget.style.color = 'var(--danger)'}
-                    onMouseLeave={e => e.currentTarget.style.color = 'var(--text-3)'}>
+          {/* List of added refs — styled like series entries */}
+          {value.map((ref, idx) => (
+            <div key={ref.id} style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: 10, alignItems: 'center', marginBottom: 8 }}>
+              <div style={{ padding: '9px 12px', border: '1px solid var(--border-2)', borderRadius: 'var(--r)', background: 'var(--bg)', fontSize: 13, color: 'var(--text)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, minWidth: 0 }}>
+                <span style={{ fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{ref.name}</span>
+                {ref.primary_category && (
+                  <span style={{ fontSize: 10.5, color: 'var(--text-3)', flexShrink: 0, background: 'var(--surface-3)', padding: '2px 7px', borderRadius: 100 }}>
+                    {ref.primary_category}{ref.secondary_category ? ` ${ref.secondary_category}` : ''}
+                  </span>
+                )}
+              </div>
+              <button type="button" onClick={() => remove(ref.id)}
+                style={{ background: 'transparent', border: '1px solid var(--border-2)', borderRadius: 'var(--r)', cursor: 'pointer', color: 'var(--text-3)', display: 'flex', alignItems: 'center', justifyContent: 'center', width: 32, height: 32, transition: 'all 0.15s', flexShrink: 0 }}
+                onMouseEnter={e => { e.currentTarget.style.color = 'var(--danger)'; e.currentTarget.style.borderColor = 'var(--danger)'; }}
+                onMouseLeave={e => { e.currentTarget.style.color = 'var(--text-3)'; e.currentTarget.style.borderColor = 'var(--border-2)'; }}>
+                <I.X />
+              </button>
+            </div>
+          ))}
+
+          {/* Search input — shown when adding */}
+          {(value.length === 0 || showSearch) && (
+            <div style={{ position: 'relative', marginBottom: showSearch ? 0 : 0 }}>
+              <div style={{ position: 'relative' }}>
+                <span style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: 'var(--text-3)', display: 'flex', pointerEvents: 'none' }}><I.Search /></span>
+                <input ref={searchRef} className="form-input" value={search} onChange={e => setSearch(e.target.value)}
+                  placeholder="Search for a policy to reference…"
+                  style={{ ...inp, paddingLeft: 32 }} />
+                {searching && <span style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', display: 'flex' }}><I.Spin /></span>}
+                {showSearch && !searching && (
+                  <button type="button" onClick={cancelSearch}
+                    style={{ position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)', background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-3)', display: 'flex', padding: 2, borderRadius: 4 }}>
                     <I.X />
                   </button>
+                )}
+              </div>
+              {results.length > 0 && (
+                <div style={{ border: '1px solid var(--border)', borderRadius: 'var(--r)', marginTop: 5, background: 'var(--surface)', overflow: 'hidden', maxHeight: 190, overflowY: 'auto', boxShadow: 'var(--shadow-md)' }}>
+                  {results.map((p, i) => (
+                    <button key={p.id} type="button" onClick={() => add(p)} className="menu-item"
+                      style={{ width: '100%', textAlign: 'left', padding: '9px 14px', background: 'transparent', border: 'none', borderBottom: i < results.length - 1 ? '1px solid var(--border)' : 'none', cursor: 'pointer', fontSize: 13, color: 'var(--text)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, fontFamily: 'var(--font-u)', transition: 'background 0.1s' }}>
+                      <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontWeight: 500 }}>{p.name}</span>
+                      <span style={{ fontSize: 10.5, color: 'var(--text-3)', flexShrink: 0 }}>{p.primary_category}{p.secondary_category ? ` ${p.secondary_category}` : ''}</span>
+                    </button>
+                  ))}
                 </div>
-              ))}
-              <p style={{ fontSize: 11, color: 'var(--text-3)', marginBottom: 10, display: 'flex', alignItems: 'center', gap: 5 }}>
-                <I.Grip /> Drag to reorder · click × to remove
-              </p>
+              )}
             </div>
           )}
 
-          <div style={{ position: 'relative' }}>
-            <span style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: 'var(--text-3)', display: 'flex', pointerEvents: 'none' }}><I.Search /></span>
-            <input className="form-input" value={search} onChange={e => setSearch(e.target.value)}
-              placeholder={value.length === 0 ? 'Search for policies to reference…' : 'Add another referenced policy…'}
-              style={inp} />
-            {searching && <span style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', display: 'flex' }}><I.Spin /></span>}
-          </div>
-
-          {results.length > 0 && (
-            <div style={{ border: '1px solid var(--border)', borderRadius: 'var(--r)', marginTop: 5, background: 'var(--surface)', overflow: 'hidden', maxHeight: 190, overflowY: 'auto', boxShadow: 'var(--shadow-md)' }}>
-              {results.map((p, i) => (
-                <button key={p.id} onClick={() => add(p)} className="menu-item"
-                  style={{ width: '100%', textAlign: 'left', padding: '9px 14px', background: 'transparent', border: 'none', borderBottom: i < results.length - 1 ? '1px solid var(--border)' : 'none', cursor: 'pointer', fontSize: 13, color: 'var(--text)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, fontFamily: 'var(--font-u)', transition: 'background 0.1s' }}>
-                  <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontWeight: 500 }}>{p.name}</span>
-                  <span style={{ fontSize: 10.5, color: 'var(--text-3)', flexShrink: 0 }}>{p.primary_category}</span>
-                </button>
-              ))}
+          {/* Add another button — shown when refs exist and not searching */}
+          {value.length > 0 && !showSearch && (
+            <div style={{ marginTop: 4 }}>
+              <button type="button" onClick={openSearch}
+                style={{ background: 'transparent', border: '1px dashed var(--border-2)', borderRadius: 'var(--r)', cursor: 'pointer', color: 'var(--text-3)', display: 'inline-flex', alignItems: 'center', gap: 6, padding: '6px 12px', fontSize: 12, fontFamily: 'var(--font-u)', transition: 'all 0.15s' }}
+                onMouseEnter={e => { e.currentTarget.style.color = 'var(--accent)'; e.currentTarget.style.borderColor = 'var(--accent)'; }}
+                onMouseLeave={e => { e.currentTarget.style.color = 'var(--text-3)'; e.currentTarget.style.borderColor = 'var(--border-2)'; }}>
+                <I.Plus /> Add another reference
+              </button>
             </div>
           )}
         </div>
