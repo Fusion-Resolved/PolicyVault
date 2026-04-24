@@ -160,6 +160,28 @@
     input[type="date"] { color-scheme: light; }
     [data-dark="true"] input[type="date"] { color-scheme: dark; }
     input[type="date"]::-webkit-calendar-picker-indicator { opacity: 0.5; cursor: pointer; }
+
+    /* Flat, 2-D select dropdowns — no native sheen */
+    select, select.form-input {
+      appearance: none;
+      -webkit-appearance: none;
+      -moz-appearance: none;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%239E9C96' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
+      background-repeat: no-repeat;
+      background-position: right 10px center;
+      padding-right: 32px !important;
+      cursor: pointer;
+    }
+    select:focus { border-color: var(--accent) !important; box-shadow: 0 0 0 3px var(--accent-muted) !important; }
+
+    /* Policy document — uniform serif font throughout */
+    .policy-doc { font-family: var(--font-policy, var(--font-d)); color: var(--policy-text-color, var(--text)); }
+    .policy-doc-size { font-size: var(--font-policy-size, 14.5px); }
+
+    /* Settings modal tabs */
+    .settings-tab { transition: background 0.15s, color 0.15s; }
+    .settings-tab:hover { background: var(--surface-3) !important; }
+    .settings-tab.active { background: var(--surface) !important; color: var(--text) !important; box-shadow: var(--shadow-sm); }
   </style>
 </head>
 <body>
@@ -213,7 +235,12 @@
       return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' });
     };
 
-    const DEFAULT_SETTINGS = { documentPrefixes: ['Policy'] };
+    const DEFAULT_SETTINGS = {
+      documentPrefixes: ['Policy'],
+      policyFont:       'serif',       // 'serif' | 'sans'
+      policyFontColor:  '',            // '' = use --text var; else hex
+      policyFontSize:   '14.5',        // px number as string
+    };
     const loadSettings = () => {
       try { const s = localStorage.getItem('pv-settings'); return s ? { ...DEFAULT_SETTINGS, ...JSON.parse(s) } : DEFAULT_SETTINGS; }
       catch { return DEFAULT_SETTINGS; }
@@ -743,7 +770,7 @@
           <div style={{ padding: '10px 28px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'flex-end', flexShrink: 0, background: 'var(--surface)' }}>
             <Btn variant="default" size="sm" onClick={() => onEdit(policy)}><I.Edit /> Edit Policy</Btn>
           </div>
-          <div style={{ flex: 1, overflowY: 'auto', padding: '3rem 3.5rem', maxWidth: 860 }}>
+          <div style={{ flex: 1, overflowY: 'auto', padding: '3rem 3.5rem', maxWidth: 860 }} className="policy-doc">
 
             {/* Policy Date — centre top */}
             {(() => { const m = parseContent(policy.content); return (
@@ -779,7 +806,7 @@
                 })()}
 
                 {/* Policy Title — large, centred */}
-                <h1 style={{ fontFamily: 'var(--font-d)', fontSize: 34, fontWeight: 500, lineHeight: 1.22, marginBottom: '2rem', letterSpacing: '-0.02em', textAlign: 'center' }}>{policy.name}</h1>
+                <h1 style={{ fontFamily: 'var(--font-policy, var(--font-d))', fontSize: 34, fontWeight: 500, lineHeight: 1.22, marginBottom: '2rem', letterSpacing: '-0.02em', textAlign: 'center' }}>{policy.name}</h1>
 
                 {/* Referenced policies — centred, fixed-width type column, label offset left */}
                 {refsLoading && (
@@ -807,7 +834,7 @@
                             {/* Row 2: empty×4 | policy name (clickable) */}
                             <span /><span /><span /><span />
                             <button onClick={() => onNavigate && onNavigate(ref)}
-                              style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-2)', fontSize: 13, fontWeight: 400, textAlign: 'left', fontFamily: 'var(--font-u)', padding: 0, lineHeight: 1.7, marginBottom: '0.5rem' }}>
+                              style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-2)', fontSize: 13, fontWeight: 400, textAlign: 'left', fontFamily: 'var(--font-policy, var(--font-d))', padding: 0, lineHeight: 1.7, marginBottom: '0.5rem' }}>
                               {ref.name}
                             </button>
                           </div>
@@ -817,8 +844,8 @@
                   </div>
                 )}
 
-                {/* Body — left aligned */}
-                <div style={{ fontSize: 14.5, lineHeight: 1.95, color: 'var(--text)', whiteSpace: 'pre-wrap', wordBreak: 'break-word', fontWeight: 300, letterSpacing: '0.01em', marginBottom: '3rem' }}>{m.body}</div>
+                {/* Body — left aligned, uniform policy font */}
+                <div className="policy-doc-size" style={{ lineHeight: 1.95, color: 'var(--policy-text-color, var(--text))', whiteSpace: 'pre-wrap', wordBreak: 'break-word', fontWeight: 300, letterSpacing: '0.01em', marginBottom: '3rem' }}>{m.body}</div>
 
                 {/* Author — right margin */}
                 {(m.author_name || m.author_role) && (
@@ -869,7 +896,6 @@
 
       return (
         <div>
-          <label style={lbl}>Referenced Policies</label>
 
           {/* List of added refs — drag handle | type input | policy name | × */}
           {value.map((ref, idx) => (
@@ -957,60 +983,276 @@
     };
 
     // ══════════════════════════════════════════════════════════════
-    //  SETTINGS MODAL
+    //  SETTINGS MODAL — tabbed: Appearance | Documents | Account
     // ══════════════════════════════════════════════════════════════
-    const SettingsModal = ({ open, settings, onSave, onClose }) => {
+    const SettingsModal = ({ open, settings, dark, onToggleDark, profile, isAdmin, onManageUsers, onSignOut, onSave, onClose }) => {
+      const [tab, setTab]           = useState('appearance');
       const [prefixes, setPrefixes] = useState([]);
+      const [policyFont, setPolicyFont]   = useState('serif');
+      const [fontColor, setFontColor]     = useState('');
+      const [fontSize, setFontSize]       = useState('14.5');
+      const [pwForm, setPwForm]           = useState({ current: '', next: '', confirm: '' });
+      const [pwMsg, setPwMsg]             = useState({ text: '', ok: false });
+      const [pwLoading, setPwLoading]     = useState(false);
+
       const inp = { width: '100%', padding: '8px 12px', border: '1px solid var(--border-2)', borderRadius: 'var(--r)', background: 'var(--bg)', color: 'var(--text)', fontFamily: 'var(--font-u)', fontSize: 13, outline: 'none', transition: 'border-color 0.15s, box-shadow 0.15s' };
       const lbl = { fontSize: 10, fontWeight: 700, color: 'var(--text-3)', marginBottom: 6, display: 'block', textTransform: 'uppercase', letterSpacing: '0.09em' };
 
       useEffect(() => {
-        if (open) setPrefixes([...(settings.documentPrefixes?.length ? settings.documentPrefixes : DEFAULT_SETTINGS.documentPrefixes)]);
+        if (open) {
+          setPrefixes([...(settings.documentPrefixes?.length ? settings.documentPrefixes : DEFAULT_SETTINGS.documentPrefixes)]);
+          setPolicyFont(settings.policyFont || 'serif');
+          setFontColor(settings.policyFontColor || '');
+          setFontSize(settings.policyFontSize || '14.5');
+          setPwForm({ current: '', next: '', confirm: '' });
+          setPwMsg({ text: '', ok: false });
+        }
       }, [open, settings]);
 
       const save = () => {
         const cleaned = prefixes.map(p => p.trim()).filter(Boolean);
-        const next = { ...settings, documentPrefixes: cleaned.length ? cleaned : DEFAULT_SETTINGS.documentPrefixes };
+        const next = {
+          ...settings,
+          documentPrefixes: cleaned.length ? cleaned : DEFAULT_SETTINGS.documentPrefixes,
+          policyFont,
+          policyFontColor: fontColor,
+          policyFontSize:  fontSize,
+        };
         onSave(next);
         onClose();
       };
 
+      const handlePwChange = async () => {
+        setPwMsg({ text: '', ok: false });
+        if (!pwForm.next) { setPwMsg({ text: 'New password is required.', ok: false }); return; }
+        if (pwForm.next.length < 8) { setPwMsg({ text: 'Password must be at least 8 characters.', ok: false }); return; }
+        if (pwForm.next !== pwForm.confirm) { setPwMsg({ text: 'Passwords do not match.', ok: false }); return; }
+        setPwLoading(true);
+        try {
+          const { error } = await db.auth.updateUser({ password: pwForm.next });
+          if (error) { setPwMsg({ text: error.message, ok: false }); }
+          else { setPwMsg({ text: 'Password updated successfully.', ok: true }); setPwForm({ current: '', next: '', confirm: '' }); }
+        } catch (e) { setPwMsg({ text: 'An error occurred.', ok: false }); }
+        setPwLoading(false);
+      };
+
       if (!open) return null;
+
+      const TABS = [
+        { id: 'appearance', label: 'Appearance' },
+        { id: 'documents',  label: 'Documents'  },
+        { id: 'account',    label: 'Account'    },
+      ];
+
+      const fontOptions = [
+        { value: 'serif', label: 'Cormorant Garamond', preview: "'Cormorant Garamond', Georgia, serif" },
+        { value: 'sans',  label: 'Plus Jakarta Sans',  preview: "'Plus Jakarta Sans', -apple-system, sans-serif" },
+      ];
+
+      const presetColors = [
+        { label: 'Default',   value: '' },
+        { label: 'Slate',     value: '#334155' },
+        { label: 'Forest',    value: '#1B5244' },
+        { label: 'Midnight',  value: '#1e1e2e' },
+        { label: 'Burgundy',  value: '#6b2737' },
+      ];
+
       return (
         <div onClick={e => { if (e.target === e.currentTarget) onClose(); }}
           style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 200, padding: '1rem', backdropFilter: 'blur(6px)', WebkitBackdropFilter: 'blur(6px)' }}>
-          <div className="slide-up" style={{ background: 'var(--surface)', borderRadius: 'var(--r-lg)', width: '100%', maxWidth: 500, maxHeight: '85vh', display: 'flex', flexDirection: 'column', boxShadow: 'var(--shadow-lg), 0 0 0 1px var(--border)' }}>
-            <div style={{ padding: '16px 22px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
-              <h2 style={{ fontFamily: 'var(--font-d)', fontSize: 24, fontWeight: 400, letterSpacing: '-0.015em' }}>Settings</h2>
-              <button onClick={onClose} className="btn-icon" style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-2)', display: 'flex', padding: 6, borderRadius: 'var(--r)', transition: 'all 0.15s' }}><I.X /></button>
-            </div>
-            <div style={{ flex: 1, overflowY: 'auto', padding: '20px 22px', display: 'flex', flexDirection: 'column', gap: 16 }}>
-              <div>
-                <label style={lbl}>Document Types</label>
-                <p style={{ fontSize: 12, color: 'var(--text-3)', marginBottom: 12, lineHeight: 1.6 }}>
-                  Each option appears before "of [date]" in the policy header — e.g. "Policy" displays as "Policy of 10 June 2026".
-                </p>
-                {prefixes.map((p, i) => (
-                  <div key={i} style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: 8, marginBottom: 8, alignItems: 'center' }}>
-                    <input className="form-input" style={inp} value={p}
-                      onChange={e => { const next = [...prefixes]; next[i] = e.target.value; setPrefixes(next); }}
-                      placeholder="e.g. Policy" />
-                    <button type="button" onClick={() => setPrefixes(prefixes.filter((_, j) => j !== i))}
-                      style={{ background: 'transparent', border: '1px solid var(--border-2)', borderRadius: 'var(--r)', cursor: 'pointer', color: 'var(--text-3)', display: 'flex', alignItems: 'center', justifyContent: 'center', width: 32, height: 32, transition: 'all 0.15s', flexShrink: 0 }}
-                      onMouseEnter={e => { e.currentTarget.style.color = 'var(--danger)'; e.currentTarget.style.borderColor = 'var(--danger)'; }}
-                      onMouseLeave={e => { e.currentTarget.style.color = 'var(--text-3)'; e.currentTarget.style.borderColor = 'var(--border-2)'; }}>
-                      <I.X />
-                    </button>
-                  </div>
+          <div className="slide-up" style={{ background: 'var(--surface)', borderRadius: 'var(--r-lg)', width: '100%', maxWidth: 560, maxHeight: '88vh', display: 'flex', flexDirection: 'column', boxShadow: 'var(--shadow-lg), 0 0 0 1px var(--border)' }}>
+
+            {/* Header */}
+            <div style={{ padding: '18px 22px 0', borderBottom: '1px solid var(--border)', flexShrink: 0 }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+                <h2 style={{ fontFamily: 'var(--font-d)', fontSize: 24, fontWeight: 400, letterSpacing: '-0.015em' }}>Settings</h2>
+                <button onClick={onClose} className="btn-icon" style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-2)', display: 'flex', padding: 6, borderRadius: 'var(--r)', transition: 'all 0.15s' }}><I.X /></button>
+              </div>
+              {/* Tab bar */}
+              <div style={{ display: 'flex', gap: 2, background: 'var(--surface-2)', borderRadius: 'calc(var(--r) + 2px)', padding: 3, width: 'fit-content' }}>
+                {TABS.map(t => (
+                  <button key={t.id} onClick={() => setTab(t.id)}
+                    className={`settings-tab${tab === t.id ? ' active' : ''}`}
+                    style={{ padding: '6px 16px', fontSize: 12.5, fontWeight: 700, border: 'none', borderRadius: 'var(--r)', cursor: 'pointer', fontFamily: 'var(--font-u)', background: tab === t.id ? 'var(--surface)' : 'transparent', color: tab === t.id ? 'var(--text)' : 'var(--text-3)', letterSpacing: '0.01em' }}>
+                    {t.label}
+                  </button>
                 ))}
-                <button type="button" onClick={() => setPrefixes([...prefixes, ''])}
-                  style={{ background: 'transparent', border: '1px dashed var(--border-2)', borderRadius: 'var(--r)', cursor: 'pointer', color: 'var(--text-3)', display: 'inline-flex', alignItems: 'center', gap: 6, padding: '6px 12px', fontSize: 12, fontFamily: 'var(--font-u)', marginTop: 4, transition: 'all 0.15s' }}
-                  onMouseEnter={e => { e.currentTarget.style.color = 'var(--accent)'; e.currentTarget.style.borderColor = 'var(--accent)'; }}
-                  onMouseLeave={e => { e.currentTarget.style.color = 'var(--text-3)'; e.currentTarget.style.borderColor = 'var(--border-2)'; }}>
-                  <I.Plus /> Add document type
-                </button>
               </div>
             </div>
+
+            {/* Tab: Appearance */}
+            {tab === 'appearance' && (
+              <div style={{ flex: 1, overflowY: 'auto', padding: '22px 22px', display: 'flex', flexDirection: 'column', gap: 24 }}>
+
+                {/* Dark / Light mode */}
+                <div>
+                  <label style={lbl}>Colour Scheme</label>
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    {[{ val: false, icon: '☀', label: 'Light' }, { val: true, icon: '🌙', label: 'Dark' }].map(opt => (
+                      <button key={opt.label} type="button" onClick={() => { if (dark !== opt.val) onToggleDark(); }}
+                        style={{ flex: 1, padding: '10px 14px', border: `1.5px solid ${dark === opt.val ? 'var(--accent)' : 'var(--border-2)'}`, borderRadius: 'var(--r)', background: dark === opt.val ? 'var(--accent-muted)' : 'var(--bg)', color: dark === opt.val ? 'var(--accent)' : 'var(--text-2)', cursor: 'pointer', fontFamily: 'var(--font-u)', fontSize: 13, fontWeight: dark === opt.val ? 700 : 400, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7, transition: 'all 0.15s' }}>
+                        <span style={{ fontSize: 16 }}>{opt.icon}</span> {opt.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Policy font family */}
+                <div>
+                  <label style={lbl}>Policy Font</label>
+                  <p style={{ fontSize: 12, color: 'var(--text-3)', marginBottom: 10, lineHeight: 1.55 }}>Applied to all policy document text — title, body, and references.</p>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                    {fontOptions.map(opt => (
+                      <button key={opt.value} type="button" onClick={() => setPolicyFont(opt.value)}
+                        style={{ padding: '12px 14px', border: `1.5px solid ${policyFont === opt.value ? 'var(--accent)' : 'var(--border-2)'}`, borderRadius: 'var(--r)', background: policyFont === opt.value ? 'var(--accent-muted)' : 'var(--bg)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'space-between', transition: 'all 0.15s', textAlign: 'left' }}>
+                        <span style={{ fontFamily: opt.preview, fontSize: 18, color: policyFont === opt.value ? 'var(--accent-text)' : 'var(--text)', fontWeight: policyFont === opt.value ? 600 : 400 }}>{opt.label}</span>
+                        {policyFont === opt.value && <I.Check />}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Font size */}
+                <div>
+                  <label style={lbl}>Policy Font Size — {fontSize}px</label>
+                  <input type="range" min="12" max="20" step="0.5" value={fontSize}
+                    onChange={e => setFontSize(e.target.value)}
+                    style={{ width: '100%', accentColor: 'var(--accent)', cursor: 'pointer' }} />
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: 'var(--text-3)', marginTop: 4 }}>
+                    <span>12px — Compact</span><span>16px — Default</span><span>20px — Large</span>
+                  </div>
+                </div>
+
+                {/* Font colour */}
+                <div>
+                  <label style={lbl}>Policy Text Colour</label>
+                  <p style={{ fontSize: 12, color: 'var(--text-3)', marginBottom: 10, lineHeight: 1.55 }}>Override the body text colour in policy documents.</p>
+                  <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 10 }}>
+                    {presetColors.map(c => (
+                      <button key={c.value} type="button" title={c.label} onClick={() => setFontColor(c.value)}
+                        style={{ width: 32, height: 32, borderRadius: 'var(--r)', border: `2px solid ${fontColor === c.value ? 'var(--accent)' : 'var(--border-2)'}`, background: c.value || 'var(--text)', cursor: 'pointer', position: 'relative', transition: 'border-color 0.15s', overflow: 'hidden', flexShrink: 0 }}>
+                        {c.value === '' && <span style={{ fontFamily: 'var(--font-u)', fontSize: 10, fontWeight: 700, color: '#fff', textShadow: '0 1px 2px rgba(0,0,0,0.4)' }}>A</span>}
+                        {fontColor === c.value && c.value !== '' && <span style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><I.Check /></span>}
+                      </button>
+                    ))}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <input type="color" value={fontColor || '#18170F'} onChange={e => setFontColor(e.target.value)}
+                        title="Custom colour"
+                        style={{ width: 32, height: 32, border: '1.5px solid var(--border-2)', borderRadius: 'var(--r)', background: 'transparent', cursor: 'pointer', padding: 2 }} />
+                      <span style={{ fontSize: 11, color: 'var(--text-3)' }}>Custom</span>
+                    </div>
+                  </div>
+                  {fontColor && (
+                    <button type="button" onClick={() => setFontColor('')}
+                      style={{ fontSize: 11, color: 'var(--text-3)', background: 'transparent', border: 'none', cursor: 'pointer', padding: 0, textDecoration: 'underline', fontFamily: 'var(--font-u)' }}>
+                      Reset to default
+                    </button>
+                  )}
+                </div>
+
+                {/* Live preview */}
+                <div>
+                  <label style={lbl}>Preview</label>
+                  <div style={{ border: '1px solid var(--border-2)', borderRadius: 'var(--r)', padding: '16px 20px', background: 'var(--bg)' }}>
+                    <p style={{ fontFamily: fontOptions.find(f => f.value === policyFont)?.preview, fontSize: parseFloat(fontSize), color: fontColor || 'var(--text)', lineHeight: 1.8, fontWeight: 300 }}>
+                      This is how your policy body text will appear. Clear, consistent, and readable across all documents.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Tab: Documents */}
+            {tab === 'documents' && (
+              <div style={{ flex: 1, overflowY: 'auto', padding: '22px 22px', display: 'flex', flexDirection: 'column', gap: 16 }}>
+                <div>
+                  <label style={lbl}>Document Types</label>
+                  <p style={{ fontSize: 12, color: 'var(--text-3)', marginBottom: 12, lineHeight: 1.6 }}>
+                    Each option appears before "of [date]" in the policy header — e.g. "Policy" displays as "Policy of 10 June 2026".
+                  </p>
+                  {prefixes.map((p, i) => (
+                    <div key={i} style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: 8, marginBottom: 8, alignItems: 'center' }}>
+                      <input className="form-input" style={inp} value={p}
+                        onChange={e => { const next = [...prefixes]; next[i] = e.target.value; setPrefixes(next); }}
+                        placeholder="e.g. Policy" />
+                      <button type="button" onClick={() => setPrefixes(prefixes.filter((_, j) => j !== i))}
+                        style={{ background: 'transparent', border: '1px solid var(--border-2)', borderRadius: 'var(--r)', cursor: 'pointer', color: 'var(--text-3)', display: 'flex', alignItems: 'center', justifyContent: 'center', width: 32, height: 32, transition: 'all 0.15s', flexShrink: 0 }}
+                        onMouseEnter={e => { e.currentTarget.style.color = 'var(--danger)'; e.currentTarget.style.borderColor = 'var(--danger)'; }}
+                        onMouseLeave={e => { e.currentTarget.style.color = 'var(--text-3)'; e.currentTarget.style.borderColor = 'var(--border-2)'; }}>
+                        <I.X />
+                      </button>
+                    </div>
+                  ))}
+                  <button type="button" onClick={() => setPrefixes([...prefixes, ''])}
+                    style={{ background: 'transparent', border: '1px dashed var(--border-2)', borderRadius: 'var(--r)', cursor: 'pointer', color: 'var(--text-3)', display: 'inline-flex', alignItems: 'center', gap: 6, padding: '6px 12px', fontSize: 12, fontFamily: 'var(--font-u)', marginTop: 4, transition: 'all 0.15s' }}
+                    onMouseEnter={e => { e.currentTarget.style.color = 'var(--accent)'; e.currentTarget.style.borderColor = 'var(--accent)'; }}
+                    onMouseLeave={e => { e.currentTarget.style.color = 'var(--text-3)'; e.currentTarget.style.borderColor = 'var(--border-2)'; }}>
+                    <I.Plus /> Add document type
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Tab: Account */}
+            {tab === 'account' && (
+              <div style={{ flex: 1, overflowY: 'auto', padding: '22px 22px', display: 'flex', flexDirection: 'column', gap: 24 }}>
+
+                {/* Account info */}
+                <div style={{ background: 'var(--surface-2)', borderRadius: 'var(--r)', padding: '14px 16px', display: 'flex', alignItems: 'center', gap: 14 }}>
+                  <div style={{ width: 42, height: 42, borderRadius: '50%', background: isAdmin ? 'var(--accent-bg)' : 'var(--surface-3)', border: `1.5px solid ${isAdmin ? 'var(--accent)' : 'var(--border-2)'}`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 700, color: isAdmin ? 'var(--accent)' : 'var(--text-2)', flexShrink: 0 }}>
+                    {(profile?.email || '?')[0].toUpperCase()}
+                  </div>
+                  <div style={{ minWidth: 0 }}>
+                    <div style={{ fontSize: 13, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{profile?.email}</div>
+                    <div style={{ fontSize: 11, color: isAdmin ? 'var(--accent)' : 'var(--text-3)', marginTop: 2, fontWeight: isAdmin ? 700 : 400, display: 'flex', alignItems: 'center', gap: 4 }}>
+                      {isAdmin ? <><I.Shield /> Administrator</> : <span>Standard User</span>}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Change password */}
+                <div>
+                  <label style={lbl}>Change Password</label>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                    <input className="form-input" style={inp} type="password" placeholder="New password (min. 8 chars)" value={pwForm.next}
+                      onChange={e => setPwForm(p => ({ ...p, next: e.target.value }))} />
+                    <input className="form-input" style={inp} type="password" placeholder="Confirm new password" value={pwForm.confirm}
+                      onChange={e => setPwForm(p => ({ ...p, confirm: e.target.value }))} />
+                    {pwMsg.text && (
+                      <div style={{ fontSize: 12.5, color: pwMsg.ok ? 'var(--accent)' : 'var(--danger)', background: pwMsg.ok ? 'var(--accent-bg)' : 'var(--danger-bg)', padding: '8px 12px', borderRadius: 'var(--r)', borderLeft: `3px solid ${pwMsg.ok ? 'var(--accent)' : 'var(--danger)'}` }}>
+                        {pwMsg.text}
+                      </div>
+                    )}
+                    <Btn variant="default" onClick={handlePwChange} disabled={pwLoading} full>
+                      {pwLoading ? <><I.Spin /> Updating…</> : 'Update Password'}
+                    </Btn>
+                  </div>
+                </div>
+
+                {/* Admin: manage users */}
+                {isAdmin && (
+                  <div style={{ borderTop: '1px solid var(--border)', paddingTop: 20 }}>
+                    <label style={lbl}>Administration</label>
+                    <button type="button" onClick={onManageUsers}
+                      style={{ width: '100%', padding: '11px 14px', border: '1px solid var(--border-2)', borderRadius: 'var(--r)', background: 'var(--bg)', color: 'var(--text)', cursor: 'pointer', fontFamily: 'var(--font-u)', fontSize: 13, fontWeight: 500, display: 'flex', alignItems: 'center', gap: 9, transition: 'background 0.15s', textAlign: 'left' }}
+                      className="menu-item">
+                      <I.Users /> Manage Users &amp; Approvals
+                      <span style={{ marginLeft: 'auto', color: 'var(--text-3)', fontSize: 11 }}>→</span>
+                    </button>
+                  </div>
+                )}
+
+                {/* Sign out */}
+                <div style={{ borderTop: '1px solid var(--border)', paddingTop: 20, marginTop: 'auto' }}>
+                  <label style={lbl}>Session</label>
+                  <Btn variant="danger" full onClick={() => { onClose(); onSignOut(); }}>
+                    <I.LogOut /> Sign Out
+                  </Btn>
+                </div>
+              </div>
+            )}
+
+            {/* Footer actions */}
             <div style={{ padding: '14px 22px', borderTop: '1px solid var(--border)', display: 'flex', justifyContent: 'flex-end', gap: 8, flexShrink: 0 }}>
               <Btn variant="ghost" onClick={onClose}>Cancel</Btn>
               <Btn variant="primary" onClick={save}>Save Settings</Btn>
@@ -1284,7 +1526,7 @@
               {sectionDivider('Policy Content')}
               <div>
                 <label style={lbl}>Body *</label>
-                <textarea className="form-input" style={{ ...inp, minHeight: 220, resize: 'vertical', lineHeight: 1.8, fontWeight: 300 }} value={form.body} onChange={f('body')} placeholder="Enter the full policy text…" />
+                <textarea className="form-input" style={{ ...inp, minHeight: 220, resize: 'vertical', lineHeight: 1.8, fontWeight: 300, fontFamily: 'var(--font-policy, var(--font-d))' }} value={form.body} onChange={f('body')} placeholder="Enter the full policy text…" />
               </div>
 
               {/* 7. Author */}
@@ -1393,6 +1635,14 @@
       const userMenuRef = useRef(null);
 
       useEffect(() => { document.documentElement.setAttribute('data-dark', String(dark)); localStorage.setItem('pv-dark', dark); }, [dark]);
+
+      useEffect(() => {
+        const root = document.documentElement;
+        const fontMap = { serif: "'Cormorant Garamond', Georgia, serif", sans: "'Plus Jakarta Sans', -apple-system, sans-serif" };
+        root.style.setProperty('--font-policy', fontMap[settings.policyFont] || fontMap.serif);
+        root.style.setProperty('--font-policy-size', (settings.policyFontSize || '14.5') + 'px');
+        root.style.setProperty('--policy-text-color', settings.policyFontColor || '');
+      }, [settings]);
 
       useEffect(() => {
         if (!configured) { setAuthState('unauthenticated'); return; }
@@ -1568,7 +1818,7 @@
 
           <PolicyModal open={policyModal.open} mode={policyModal.mode} editPolicy={policyModal.mode === 'edit' ? activePolicy : null} cats={cats} settings={settings} onSave={handleSavePolicy} onClose={() => setPolicyModal(m => ({ ...m, open: false }))} />
           <UserManagementModal open={usersModal} currentUserId={user?.id} onClose={() => setUsersModal(false)} />
-          <SettingsModal open={settingsModal} settings={settings} onSave={s => { setSettings(s); saveSettingsToStorage(s); }} onClose={() => setSettingsModal(false)} />
+          <SettingsModal open={settingsModal} settings={settings} dark={dark} onToggleDark={toggleDark} profile={profile} isAdmin={isAdmin} onManageUsers={() => { setUsersModal(true); setSettingsModal(false); }} onSignOut={handleSignOut} onSave={s => { setSettings(s); saveSettingsToStorage(s); }} onClose={() => setSettingsModal(false)} />
         </div>
       );
     }
