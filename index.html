@@ -190,7 +190,19 @@
     .action-menu-item.danger { color: var(--danger); }
     .action-menu-item.danger:hover { background: var(--danger-bg); }
 
-    /* Expand button hover */
+    /* Panel collapse toggle strips */
+    .panel-toggle {
+      width: 14px; flex-shrink: 0; background: transparent; border: none;
+      border-right: 1px solid var(--border); cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      color: var(--text-3); padding: 0; transition: color 0.15s, background 0.15s;
+    }
+    .panel-toggle:hover { background: var(--surface-2) !important; color: var(--accent) !important; }
+
+    /* Smooth panel collapse */
+    .panel-collapsible { transition: width 0.22s cubic-bezier(0.22,1,0.36,1); overflow: hidden; flex-shrink: 0; }
+
+    /* expand button hover */
     .expand-btn:hover { background: var(--surface-2) !important; }
 
     @media print {
@@ -433,6 +445,7 @@
       Moon:    () => <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>,
       Plus:    () => <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>,
       CRight:  () => <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><path d="m9 18 6-6-6-6"/></svg>,
+      CLeft:   () => <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><path d="m15 18-6-6 6-6"/></svg>,
       CDown:   () => <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><path d="m6 9 6 6 6-6"/></svg>,
       Edit:    () => <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4z"/></svg>,
       X:       () => <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>,
@@ -914,17 +927,21 @@
       };
 
       return (
-        <aside style={{ width: 'var(--sidebar-w)', minWidth: 'var(--sidebar-w)', borderRight: '1px solid var(--border)', overflowY: 'auto', padding: '14px 8px 24px', display: 'flex', flexDirection: 'column', gap: 1 }}>
+        <aside style={{ width: '100%', height: '100%', overflowY: 'auto', padding: '14px 8px 24px', display: 'flex', flexDirection: 'column', gap: 1 }}>
           <div style={{ fontSize: 9.5, letterSpacing: '0.12em', textTransform: 'uppercase', color: 'var(--text-3)', fontWeight: 700, padding: '2px 12px 10px', display: 'flex', alignItems: 'center', gap: 8 }}>
             <span>Series</span>
             <div style={{ flex: 1, height: 1, background: 'var(--border-2)' }} />
           </div>
 
-          {/* All Policies */}
-          <button style={{ ...rowStyle(!sel.primary), width: '100%' }} className="sidebar-row"
-            onClick={() => onSelect({})}>
-            <I.File2 /> All Policies
-          </button>
+          {/* All Policies — same flex-row structure as series rows, no three-dot */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            <button style={rowStyle(!sel.primary)} className="sidebar-row"
+              onClick={() => onSelect({})}>
+              <I.File2 /> All Policies
+            </button>
+            {/* Spacer to align with series rows that have a dots button */}
+            <div style={{ width: 28, flexShrink: 0 }} />
+          </div>
 
           {loading
             ? <div style={{ padding: '12px 12px', color: 'var(--text-3)', fontSize: 12, display: 'flex', alignItems: 'center', gap: 6 }}><I.Spin /> Loading…</div>
@@ -1860,6 +1877,8 @@
       const [settingsModal, setSettingsModal] = useState(false);
       const [settings, setSettings]           = useState(loadSettings);
       const [userMenu, setUserMenu]           = useState(false);
+      const [sidebarOpen, setSidebarOpen]     = useState(true);
+      const [listOpen, setListOpen]           = useState(true);
       const searchRef   = useRef(null);
       const userMenuRef = useRef(null);
 
@@ -2042,22 +2061,45 @@
           </header>
 
           <div style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
-            <Sidebar cats={cats} sel={sel} onSelect={ns => { setSel(ns); setActiveId(null); setActivePolicy(null); setActiveIdx(-1); }} loading={catsLoading} onDeleteSeries={handleDeleteSeries} />
-            <div style={{ width: 'var(--list-w)', minWidth: 'var(--list-w)', borderRight: '1px solid var(--border)', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-              <div style={{ padding: '8px 16px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
-                <span style={{ fontSize: 11, color: 'var(--text-3)', fontWeight: 700, letterSpacing: '0.04em' }}>{listLoading ? 'Searching…' : `${policies.length} ${policies.length === 1 ? 'policy' : 'policies'}`}</span>
-                {query && <span style={{ fontSize: 11, color: 'var(--accent)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 140, fontWeight: 700 }}>"{query}"</span>}
+
+            {/* ── Collapsible Sidebar ── */}
+            <div className="panel-collapsible" style={{ width: sidebarOpen ? 'var(--sidebar-w)' : 0 }}>
+              <div style={{ width: 'var(--sidebar-w)', height: '100%', borderRight: '1px solid var(--border)' }}>
+                <Sidebar cats={cats} sel={sel} onSelect={ns => { setSel(ns); setActiveId(null); setActivePolicy(null); setActiveIdx(-1); }} loading={catsLoading} onDeleteSeries={handleDeleteSeries} />
               </div>
-              <PolicyList policies={policies} selectedId={activeId} onSelect={openPolicy} loading={listLoading} query={query} onDeletePolicy={handleDeletePolicy} />
-              {policies.length > 1 && (
-                <div style={{ padding: '7px 16px', borderTop: '1px solid var(--border)', display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
-                  <I.Kbd k="↑" /><I.Kbd k="↓" /><span style={{ fontSize: 11, color: 'var(--text-3)' }}>navigate</span>
-                </div>
-              )}
             </div>
-            <div style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
+            {/* Sidebar toggle strip */}
+            <button className="panel-toggle" onClick={() => setSidebarOpen(v => !v)}
+              title={sidebarOpen ? 'Collapse series panel' : 'Expand series panel'}>
+              {sidebarOpen ? <I.CLeft /> : <I.CRight />}
+            </button>
+
+            {/* ── Collapsible Policy List ── */}
+            <div className="panel-collapsible" style={{ width: listOpen ? 'var(--list-w)' : 0 }}>
+              <div style={{ width: 'var(--list-w)', height: '100%', display: 'flex', flexDirection: 'column', borderRight: '1px solid var(--border)' }}>
+                <div style={{ padding: '8px 16px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
+                  <span style={{ fontSize: 11, color: 'var(--text-3)', fontWeight: 700, letterSpacing: '0.04em' }}>{listLoading ? 'Searching…' : `${policies.length} ${policies.length === 1 ? 'policy' : 'policies'}`}</span>
+                  {query && <span style={{ fontSize: 11, color: 'var(--accent)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 140, fontWeight: 700 }}>"{query}"</span>}
+                </div>
+                <PolicyList policies={policies} selectedId={activeId} onSelect={openPolicy} loading={listLoading} query={query} onDeletePolicy={handleDeletePolicy} />
+                {policies.length > 1 && (
+                  <div style={{ padding: '7px 16px', borderTop: '1px solid var(--border)', display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
+                    <I.Kbd k="↑" /><I.Kbd k="↓" /><span style={{ fontSize: 11, color: 'var(--text-3)' }}>navigate</span>
+                  </div>
+                )}
+              </div>
+            </div>
+            {/* List toggle strip */}
+            <button className="panel-toggle" onClick={() => setListOpen(v => !v)}
+              title={listOpen ? 'Collapse policy list' : 'Expand policy list'}>
+              {listOpen ? <I.CLeft /> : <I.CRight />}
+            </button>
+
+            {/* ── Policy Detail (always visible, fills remaining space) ── */}
+            <div style={{ flex: 1, display: 'flex', overflow: 'hidden', minWidth: 0 }}>
               <PolicyDetail policy={activePolicy} loading={detailLoading} onEdit={() => setPolicyModal({ open: true, mode: 'edit' })} onNavigate={(ref) => openPolicy(ref, -1)} />
             </div>
+
           </div>
 
           <PolicyModal open={policyModal.open} mode={policyModal.mode} editPolicy={policyModal.mode === 'edit' ? activePolicy : null} cats={cats} settings={settings} onSave={handleSavePolicy} onClose={() => setPolicyModal(m => ({ ...m, open: false }))} />
