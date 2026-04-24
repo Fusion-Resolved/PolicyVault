@@ -197,23 +197,32 @@
       ? new Date(iso).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })
       : '';
 
+    const toRoman = (n) => {
+      if (!n || n < 1) return '';
+      const vals = [1000,900,500,400,100,90,50,40,10,9,5,4,1];
+      const syms = ['M','CM','D','CD','C','XC','L','XL','X','IX','V','IV','I'];
+      let r = ''; let num = n;
+      vals.forEach((v, i) => { while (num >= v) { r += syms[i]; num -= v; } });
+      return r;
+    };
+
     // ── Policy content metadata helpers ───────────────────────────
     const META_START = '__PV_META_START__';
     const META_END   = '__PV_META_END__';
     const parseContent = (raw) => {
-      if (!raw) return { date: '', roles: '', author_name: '', author_role: '', series: [], body: '' };
+      if (!raw) return { date: '', issue: 0, roles: '', author_name: '', author_role: '', series: [], ref_types: {}, body: '' };
       const s = raw.indexOf(META_START), e = raw.indexOf(META_END);
       if (s === 0 && e > 0) {
         try {
           const meta = JSON.parse(raw.slice(META_START.length, e));
           const body = raw.slice(e + META_END.length).replace(/^\n/, '');
-          return { ...meta, series: meta.series || [], body };
+          return { ...meta, issue: meta.issue || 0, series: meta.series || [], ref_types: meta.ref_types || {}, body };
         } catch {}
       }
-      return { date: '', roles: '', author_name: '', author_role: '', series: [], body: raw };
+      return { date: '', issue: 0, roles: '', author_name: '', author_role: '', series: [], ref_types: {}, body: raw };
     };
-    const serializeContent = ({ date, roles, author_name, author_role, series, body }) => {
-      const meta = JSON.stringify({ date: date.trim(), roles: roles.trim(), author_name: author_name.trim(), author_role: author_role.trim(), series: series || [] });
+    const serializeContent = ({ date, issue, roles, author_name, author_role, series, ref_types, body }) => {
+      const meta = JSON.stringify({ date: date.trim(), issue: issue || 0, roles: roles.trim(), author_name: author_name.trim(), author_role: author_role.trim(), series: series || [], ref_types: ref_types || {} });
       return `${META_START}${meta}${META_END}\n${body}`;
     };
 
@@ -715,6 +724,7 @@
               <>
                 <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
                   {m.date && <p style={{ fontSize: 15, color: 'var(--text-3)', letterSpacing: '0.08em', textTransform: 'uppercase', fontWeight: 600 }}>Policy of {m.date}</p>}
+                  {m.issue > 0 && <p style={{ fontSize: 13, color: 'var(--text-3)', fontWeight: 400, marginTop: 4, letterSpacing: '0.04em' }}>Issue {toRoman(m.issue)}</p>}
                 </div>
 
                 {/* Roles left-aligned */}
@@ -726,13 +736,13 @@
                   </div>
                 )}
 
-                {/* Series — centred, directly above title */}
+                {/* Series — centred, directly above title, halved gap */}
                 {(() => {
                   const seriesEntries = (m.series && m.series.length > 0)
                     ? m.series
                     : (policy.primary_category ? [{ name: policy.primary_category, number: policy.secondary_category || '' }] : []);
                   return seriesEntries.length > 0 ? (
-                    <div style={{ textAlign: 'center', marginBottom: '1.25rem' }}>
+                    <div style={{ textAlign: 'center', marginBottom: '0.625rem' }}>
                       {seriesEntries.map((s, i) => (
                         <p key={i} style={{ fontSize: 19.5, color: 'var(--text-2)', fontWeight: 500, letterSpacing: '0.02em', lineHeight: 2 }}>
                           {s.name} Series{s.number ? ` ${s.number}` : ''}
@@ -745,12 +755,12 @@
                 {/* Policy Title — large, centred */}
                 <h1 style={{ fontFamily: 'var(--font-d)', fontSize: 34, fontWeight: 500, lineHeight: 1.22, marginBottom: '2rem', letterSpacing: '-0.02em', textAlign: 'center' }}>{policy.name}</h1>
 
-                {/* Referenced policies — centred, then shifted 30% towards left margin */}
+                {/* Referenced policies — centred, shifted 30% left, type + date + series columns */}
                 {refsLoading && (
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: 'var(--text-3)', fontSize: 12, marginBottom: '1.5rem' }}><I.Spin /> Loading references…</div>
                 )}
                 {!refsLoading && refs.length > 0 && (
-                  <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '2.5rem' }}>
+                  <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '1.67rem' }}>
                     <div style={{ transform: 'translateX(-30%)', display: 'inline-block' }}>
                       <p style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)', marginBottom: '0.4rem' }}>Related Policies:</p>
                       {refs.map((ref) => {
@@ -758,13 +768,15 @@
                         const seriesLabel = ref.primary_category
                           ? `${ref.primary_category} Series${ref.secondary_category ? ` ${ref.secondary_category}` : ''}`
                           : '';
+                        const refType = m.ref_types?.[ref.id] || '';
                         return (
-                          <div key={ref.id} style={{ display: 'grid', gridTemplateColumns: '110px 1fr', columnGap: '3rem', marginBottom: '0.15rem' }}>
-                            {/* Row 1: date (right-aligned) | series */}
+                          <div key={ref.id} style={{ display: 'grid', gridTemplateColumns: 'auto 110px 1fr', columnGap: '3rem', marginBottom: '0.15rem' }}>
+                            {/* Row 1: type | date (right-aligned) | series */}
+                            <span style={{ fontSize: 13, color: 'var(--text-2)', lineHeight: 1.7 }}>{refType}</span>
                             <span style={{ fontSize: 13, color: 'var(--text-2)', textAlign: 'right', lineHeight: 1.7 }}>{rm.date || ''}</span>
                             <span style={{ fontSize: 13, color: 'var(--text-2)', lineHeight: 1.7 }}>{seriesLabel}</span>
-                            {/* Row 2: empty | policy name (clickable) */}
-                            <span />
+                            {/* Row 2: empty | empty | policy name (clickable) */}
+                            <span /><span />
                             <button onClick={() => onNavigate && onNavigate(ref)}
                               style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-2)', fontSize: 13, fontWeight: 400, textAlign: 'left', fontFamily: 'var(--font-u)', padding: 0, lineHeight: 1.7, marginBottom: '0.5rem' }}>
                               {ref.name}
@@ -797,7 +809,7 @@
     };
 
     // ── Referenced Policies Editor ──────────────────────────────────
-    const ReferencedPoliciesEditor = ({ currentPolicyId, value, onChange }) => {
+    const ReferencedPoliciesEditor = ({ currentPolicyId, value, onChange, refTypes, onChangeRefTypes }) => {
       const [showSearch, setShowSearch] = useState(false);
       const [search, setSearch]         = useState('');
       const [results, setResults]       = useState([]);
@@ -815,21 +827,34 @@
       useEffect(() => { doSearch(search); }, [search]);
 
       const add = (p) => { onChange([...value, p]); setSearch(''); setResults([]); setShowSearch(false); };
-      const remove = (id) => onChange(value.filter(p => p.id !== id));
+      const remove = (id) => { onChange(value.filter(p => p.id !== id)); const t = { ...refTypes }; delete t[id]; onChangeRefTypes(t); };
 
       const openSearch = () => { setShowSearch(true); setTimeout(() => searchRef.current?.focus(), 40); };
       const cancelSearch = () => { setShowSearch(false); setSearch(''); setResults([]); };
 
       const lbl = { fontSize: 10, fontWeight: 700, color: 'var(--text-3)', marginBottom: 8, display: 'block', textTransform: 'uppercase', letterSpacing: '0.09em' };
       const inp = { width: '100%', padding: '9px 12px', border: '1px solid var(--border-2)', borderRadius: 'var(--r)', background: 'var(--bg)', color: 'var(--text)', fontFamily: 'var(--font-u)', fontSize: 13, outline: 'none', transition: 'border-color 0.15s, box-shadow 0.15s' };
+      const typeInp = { padding: '9px 10px', border: '1px solid var(--border-2)', borderRadius: 'var(--r)', background: 'var(--bg)', color: 'var(--text)', fontFamily: 'var(--font-u)', fontSize: 13, outline: 'none', transition: 'border-color 0.15s, box-shadow 0.15s', width: 110 };
 
       return (
         <div>
           <label style={lbl}>Referenced Policies</label>
 
-          {/* List of added refs — styled like series entries */}
+          {/* List of added refs — type input | policy name | × */}
           {value.map((ref, idx) => (
-            <div key={ref.id} style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: 10, alignItems: 'center', marginBottom: 8 }}>
+            <div key={ref.id} style={{ display: 'grid', gridTemplateColumns: '110px 1fr auto', gap: 10, alignItems: 'center', marginBottom: 8 }}>
+              <input
+                className="form-input"
+                value={refTypes[ref.id] || ''}
+                onChange={e => onChangeRefTypes({ ...refTypes, [ref.id]: e.target.value })}
+                placeholder="e.g. Policy"
+                list="pv-ref-types"
+                style={typeInp}
+                title="Reference type (e.g. Policy, Technical, Legal)"
+              />
+              <datalist id="pv-ref-types">
+                {['Policy','Technical','Legal','Financial','HR','Operational'].map(t => <option key={t} value={t} />)}
+              </datalist>
               <div style={{ padding: '9px 12px', border: '1px solid var(--border-2)', borderRadius: 'var(--r)', background: 'var(--bg)', fontSize: 13, color: 'var(--text)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, minWidth: 0 }}>
                 <span style={{ fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{ref.name}</span>
                 {ref.primary_category && (
@@ -893,11 +918,14 @@
     };
 
     const PolicyModal = ({ open, mode, editPolicy, cats, onSave, onClose }) => {
-      const blank = { name: '', body: '', series_entries: [{ name: '', number: '' }], date: '', roles: '', author_name: '', author_role: '' };
-      const [form, setForm] = useState(blank);
-      const [refs, setRefs] = useState([]);
-      const [saving, setSaving] = useState(false);
-      const [err, setErr] = useState('');
+      const blank = { name: '', body: '', series_entries: [{ name: '', number: '' }], date: '', issue: 0, roles: '', author_name: '', author_role: '' };
+      const [form, setForm]       = useState(blank);
+      const [refs, setRefs]       = useState([]);
+      const [refTypes, setRefTypes] = useState({});
+      const [showIssue, setShowIssue] = useState(false);
+      const [issueInput, setIssueInput] = useState('');
+      const [saving, setSaving]   = useState(false);
+      const [err, setErr]         = useState('');
       const nameRef = useRef(null);
 
       useEffect(() => {
@@ -911,29 +939,63 @@
             name:         editPolicy.name || '',
             series_entries,
             date:         m.date || '',
+            issue:        m.issue || 0,
             roles:        m.roles || '',
             author_name:  m.author_name || '',
             author_role:  m.author_role || '',
             body:         m.body || '',
           });
+          setRefTypes(m.ref_types || {});
+          if (m.issue > 0) { setShowIssue(true); setIssueInput(String(m.issue)); }
+          else { setShowIssue(false); setIssueInput(''); }
           apiGetReferences(editPolicy.id).then(setRefs);
         } else {
           setForm(blank);
           setRefs([]);
+          setRefTypes({});
+          setShowIssue(false);
+          setIssueInput('');
         }
         setErr(''); setSaving(false);
         setTimeout(() => nameRef.current?.focus(), 50);
       }, [open]);
 
       const f = k => e => setForm(p => ({ ...p, [k]: e.target.value }));
+
       const save = async () => {
         if (!form.name.trim())                          { setErr('Policy title is required.'); return; }
         if (!form.series_entries[0]?.name?.trim())      { setErr('Series name is required.'); return; }
         if (!form.body.trim())                          { setErr('Policy content is required.'); return; }
         setSaving(true); setErr('');
+
+        const issueNum = showIssue && issueInput ? parseInt(issueInput, 10) || 0 : form.issue || 0;
+
+        // Auto-issue: for new policies, check for same-date siblings and assign issue numbers
+        let finalIssue = issueNum;
+        if (mode === 'add' && form.date.trim() && !showIssue) {
+          const { data: allPolicies } = await db.from('policies').select('id, content');
+          const same = (allPolicies || []).filter(p => {
+            const pm = parseContent(p.content || '');
+            return pm.date?.trim() === form.date.trim();
+          });
+          if (same.length > 0) {
+            let nextIssue = 1;
+            for (const p of same) {
+              const pm = parseContent(p.content || '');
+              if (pm.issue > 0) {
+                nextIssue = Math.max(nextIssue, pm.issue + 1);
+              } else {
+                await db.from('policies').update({ content: serializeContent({ ...pm, issue: 1 }) }).eq('id', p.id);
+                nextIssue = Math.max(nextIssue, 2);
+              }
+            }
+            finalIssue = nextIssue;
+          }
+        }
+
         const dbForm = {
           name:               form.name.trim(),
-          content:            serializeContent({ date: form.date, roles: form.roles, author_name: form.author_name, author_role: form.author_role, series: form.series_entries, body: form.body }),
+          content:            serializeContent({ date: form.date, issue: finalIssue, roles: form.roles, author_name: form.author_name, author_role: form.author_role, series: form.series_entries, ref_types: refTypes, body: form.body }),
           primary_category:   form.series_entries[0]?.name?.trim() || '',
           secondary_category: form.series_entries[0]?.number?.trim() || null,
           tertiary_category:  null,
@@ -968,12 +1030,39 @@
             </div>
             <div style={{ flex: 1, overflowY: 'auto', padding: '22px 24px', display: 'flex', flexDirection: 'column', gap: 16 }}>
 
-              {/* 1. Policy Date */}
+              {/* 1. Policy Date + Issue */}
               {sectionDivider('Policy Header')}
               <div>
                 <label style={lbl}>Policy Date</label>
                 <input className="form-input" style={inp} value={form.date} onChange={f('date')} placeholder="e.g. 10 May 26" />
               </div>
+              {showIssue ? (
+                <div>
+                  <label style={lbl}>Issue Number</label>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                    <input className="form-input" style={{ ...inp, width: 120 }} type="number" min="1" value={issueInput}
+                      onChange={e => { setIssueInput(e.target.value); setForm(p => ({ ...p, issue: parseInt(e.target.value, 10) || 0 })); }}
+                      placeholder="e.g. 5" />
+                    {issueInput && parseInt(issueInput, 10) > 0 && (
+                      <span style={{ fontSize: 14, color: 'var(--text-2)', fontWeight: 500 }}>→ Issue {toRoman(parseInt(issueInput, 10))}</span>
+                    )}
+                    <button type="button" onClick={() => { setShowIssue(false); setIssueInput(''); setForm(p => ({ ...p, issue: 0 })); }}
+                      style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-3)', display: 'flex', padding: 4 }}>
+                      <I.X />
+                    </button>
+                  </div>
+                  <p style={{ fontSize: 11, color: 'var(--text-3)', marginTop: 5 }}>Displayed as "Issue {issueInput && parseInt(issueInput) > 0 ? toRoman(parseInt(issueInput)) : 'I'}" beneath the date</p>
+                </div>
+              ) : (
+                <div>
+                  <button type="button" onClick={() => { setShowIssue(true); setTimeout(() => {}, 40); }}
+                    style={{ background: 'transparent', border: '1px dashed var(--border-2)', borderRadius: 'var(--r)', cursor: 'pointer', color: 'var(--text-3)', display: 'inline-flex', alignItems: 'center', gap: 6, padding: '6px 12px', fontSize: 12, fontFamily: 'var(--font-u)', transition: 'all 0.15s' }}
+                    onMouseEnter={e => { e.currentTarget.style.color = 'var(--accent)'; e.currentTarget.style.borderColor = 'var(--accent)'; }}
+                    onMouseLeave={e => { e.currentTarget.style.color = 'var(--text-3)'; e.currentTarget.style.borderColor = 'var(--border-2)'; }}>
+                    <I.Plus /> Add Issue Number
+                  </button>
+                </div>
+              )}
 
               {/* 2. Applicable Roles */}
               <div>
@@ -1033,6 +1122,8 @@
                 currentPolicyId={mode === 'edit' ? editPolicy?.id : null}
                 value={refs}
                 onChange={setRefs}
+                refTypes={refTypes}
+                onChangeRefTypes={setRefTypes}
               />
 
               {/* 6. Policy Body */}
