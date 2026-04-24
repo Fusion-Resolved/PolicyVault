@@ -734,7 +734,7 @@
                   return seriesEntries.length > 0 ? (
                     <div style={{ textAlign: 'center', marginBottom: '1.25rem' }}>
                       {seriesEntries.map((s, i) => (
-                        <p key={i} style={{ fontSize: 26, color: 'var(--text-2)', fontWeight: 500, letterSpacing: '0.02em', lineHeight: 1.7 }}>
+                        <p key={i} style={{ fontSize: 13, color: 'var(--text-2)', fontWeight: 500, letterSpacing: '0.02em', lineHeight: 2 }}>
                           {s.name} Series{s.number ? ` ${s.number}` : ''}
                         </p>
                       ))}
@@ -745,38 +745,32 @@
                 {/* Policy Title — large, centred */}
                 <h1 style={{ fontFamily: 'var(--font-d)', fontSize: 34, fontWeight: 500, lineHeight: 1.22, marginBottom: '2rem', letterSpacing: '-0.02em', textAlign: 'center' }}>{policy.name}</h1>
 
-                {/* Referenced policies — centred block, label offset left, doubled size */}
+                {/* Referenced policies — matches screenshot layout */}
                 {refsLoading && (
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: 'var(--text-3)', fontSize: 12, marginBottom: '1.5rem' }}><I.Spin /> Loading references…</div>
                 )}
                 {!refsLoading && refs.length > 0 && (
-                  <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '2.5rem' }}>
-                    <div style={{ display: 'inline-block' }}>
-                      <p style={{ fontSize: 13, color: 'var(--text-3)', fontWeight: 600, marginBottom: '0.6rem', letterSpacing: '0.04em', textTransform: 'uppercase' }}>Referenced policies:</p>
-                      {refs.map((ref) => {
-                        const rm = parseContent(ref.content || '');
-                        const seriesLabel = ref.primary_category
-                          ? `${ref.primary_category} Series${ref.secondary_category ? ` ${ref.secondary_category}` : ''}`
-                          : '';
-                        const dateWidth = 120;
-                        return (
-                          <div key={ref.id} style={{ marginBottom: '0.9rem' }}>
-                            {/* Line 1: date + series */}
-                            <div style={{ display: 'flex', alignItems: 'baseline' }}>
-                              <span style={{ fontSize: 23, color: 'var(--text-2)', minWidth: dateWidth, flexShrink: 0, lineHeight: 1.5 }}>{rm.date || ''}</span>
-                              <span style={{ fontSize: 23, color: 'var(--text-2)', fontWeight: 500, lineHeight: 1.5 }}>{seriesLabel}</span>
-                            </div>
-                            {/* Line 2: policy name indented under series */}
-                            <div style={{ paddingLeft: dateWidth }}>
-                              <button onClick={() => onNavigate && onNavigate(ref)}
-                                style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-2)', fontSize: 23, fontWeight: 400, textAlign: 'left', fontFamily: 'var(--font-u)', padding: 0, lineHeight: 1.5 }}>
-                                {ref.name}
-                              </button>
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
+                  <div style={{ marginBottom: '2.5rem' }}>
+                    <p style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)', marginBottom: '0.4rem' }}>Related Policies:</p>
+                    {refs.map((ref) => {
+                      const rm = parseContent(ref.content || '');
+                      const seriesLabel = ref.primary_category
+                        ? `${ref.primary_category} Series${ref.secondary_category ? ` ${ref.secondary_category}` : ''}`
+                        : '';
+                      return (
+                        <div key={ref.id} style={{ display: 'grid', gridTemplateColumns: '110px 1fr', columnGap: '1.25rem', marginBottom: '0.15rem' }}>
+                          {/* Row 1: date (right-aligned) | series */}
+                          <span style={{ fontSize: 13, color: 'var(--text-2)', textAlign: 'right', lineHeight: 1.7 }}>{rm.date || ''}</span>
+                          <span style={{ fontSize: 13, color: 'var(--text-2)', lineHeight: 1.7 }}>{seriesLabel}</span>
+                          {/* Row 2: empty | policy name (clickable) */}
+                          <span />
+                          <button onClick={() => onNavigate && onNavigate(ref)}
+                            style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-2)', fontSize: 13, fontWeight: 400, textAlign: 'left', fontFamily: 'var(--font-u)', padding: 0, lineHeight: 1.7, marginBottom: '0.5rem' }}>
+                            {ref.name}
+                          </button>
+                        </div>
+                      );
+                    })}
                   </div>
                 )}
 
@@ -1031,14 +1025,22 @@
                 <input ref={nameRef} className="form-input" style={{ ...inp, fontSize: 15, fontFamily: 'var(--font-d)', fontWeight: 500 }} value={form.name} onChange={f('name')} placeholder="e.g. Central Centralise Oversight with an Asset Control Ledger" />
               </div>
 
-              {/* 5. Policy Body */}
+              {/* 5. Referenced Policies */}
+              {sectionDivider('Referenced Policies')}
+              <ReferencedPoliciesEditor
+                currentPolicyId={mode === 'edit' ? editPolicy?.id : null}
+                value={refs}
+                onChange={setRefs}
+              />
+
+              {/* 6. Policy Body */}
               {sectionDivider('Policy Content')}
               <div>
                 <label style={lbl}>Body *</label>
                 <textarea className="form-input" style={{ ...inp, minHeight: 220, resize: 'vertical', lineHeight: 1.8, fontWeight: 300 }} value={form.body} onChange={f('body')} placeholder="Enter the full policy text…" />
               </div>
 
-              {/* 6. Author */}
+              {/* 7. Author */}
               {sectionDivider('Author')}
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
                 <div>
@@ -1051,15 +1053,6 @@
                 </div>
               </div>
               <p style={{ fontSize: 11, color: 'var(--text-3)', marginTop: -8 }}>Displayed in capitals at the end of the policy, right-aligned</p>
-
-              {/* 7. Referenced Policies */}
-              <div style={{ borderTop: '1px solid var(--border)', paddingTop: 18 }}>
-                <ReferencedPoliciesEditor
-                  currentPolicyId={mode === 'edit' ? editPolicy?.id : null}
-                  value={refs}
-                  onChange={setRefs}
-                />
-              </div>
 
               {err && <div style={{ fontSize: 13, color: 'var(--danger)', background: 'var(--danger-bg)', padding: '9px 13px', borderRadius: 'var(--r)', borderLeft: '3px solid var(--danger)' }}>{err}</div>}
             </div>
