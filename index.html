@@ -213,12 +213,14 @@
       return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' });
     };
 
-    const DEFAULT_SETTINGS = { documentPrefixes: ['Policy of'] };
+    const DEFAULT_SETTINGS = { documentPrefixes: ['Policy'] };
     const loadSettings = () => {
       try { const s = localStorage.getItem('pv-settings'); return s ? { ...DEFAULT_SETTINGS, ...JSON.parse(s) } : DEFAULT_SETTINGS; }
       catch { return DEFAULT_SETTINGS; }
     };
     const saveSettingsToStorage = (s) => { try { localStorage.setItem('pv-settings', JSON.stringify(s)); } catch {} };
+    // Strip legacy trailing " of" from stored prefixes for consistent display
+    const stripOf = (s) => (s || '').replace(/\s+of\s*$/i, '').trim() || 'Policy';
 
     const toRoman = (n) => {
       if (!n || n < 1) return '';
@@ -747,7 +749,7 @@
             {(() => { const m = parseContent(policy.content); return (
               <>
                 <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
-                  {m.date && <p style={{ fontSize: 15, color: 'var(--text-3)', letterSpacing: '0.08em', textTransform: 'uppercase', fontWeight: 600 }}>{m.doc_prefix || 'Policy of'} {displayDate(m.date)}</p>}
+                  {m.date && <p style={{ fontSize: 15, color: 'var(--text-3)', letterSpacing: '0.08em', textTransform: 'uppercase', fontWeight: 600 }}>{stripOf(m.doc_prefix || 'Policy')} of {displayDate(m.date)}</p>}
                   {m.issue > 0 && <p style={{ fontSize: 13, color: 'var(--text-3)', fontWeight: 400, marginTop: 4, letterSpacing: '0.04em' }}>Issue {toRoman(m.issue)}</p>}
                 </div>
 
@@ -986,13 +988,13 @@
               <div>
                 <label style={lbl}>Document Types</label>
                 <p style={{ fontSize: 12, color: 'var(--text-3)', marginBottom: 12, lineHeight: 1.6 }}>
-                  Each option appears in the policy form as the text that precedes the date — e.g. selecting "Technical Letter of" displays "Technical Letter of 10 June 2026".
+                  Each option appears before "of [date]" in the policy header — e.g. "Policy" displays as "Policy of 10 June 2026".
                 </p>
                 {prefixes.map((p, i) => (
                   <div key={i} style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: 8, marginBottom: 8, alignItems: 'center' }}>
                     <input className="form-input" style={inp} value={p}
                       onChange={e => { const next = [...prefixes]; next[i] = e.target.value; setPrefixes(next); }}
-                      placeholder="e.g. Policy of" />
+                      placeholder="e.g. Policy" />
                     <button type="button" onClick={() => setPrefixes(prefixes.filter((_, j) => j !== i))}
                       style={{ background: 'transparent', border: '1px solid var(--border-2)', borderRadius: 'var(--r)', cursor: 'pointer', color: 'var(--text-3)', display: 'flex', alignItems: 'center', justifyContent: 'center', width: 32, height: 32, transition: 'all 0.15s', flexShrink: 0 }}
                       onMouseEnter={e => { e.currentTarget.style.color = 'var(--danger)'; e.currentTarget.style.borderColor = 'var(--danger)'; }}
@@ -1136,11 +1138,33 @@
 
               {/* 1. Policy Date + Document Type + Issue */}
               {sectionDivider('Policy Header')}
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
-                <div>
-                  <label style={lbl}>Policy Date</label>
-                  <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
-                    <input className="form-input" type="date" style={{ ...inp, paddingRight: 70 }} value={form.date} onChange={e => setForm(p => ({ ...p, date: e.target.value }))} />
+              <div>
+                <label style={lbl}>Policy Date</label>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                  {/* Document type dropdown */}
+                  {(settings?.documentPrefixes?.length > 1) ? (
+                    <select className="form-input"
+                      style={{ padding: '9px 12px', border: '1px solid var(--border-2)', borderRadius: 'var(--r)', background: 'var(--bg)', color: 'var(--text)', fontFamily: 'var(--font-u)', fontSize: 13, outline: 'none', cursor: 'pointer', flexShrink: 0, transition: 'border-color 0.15s, box-shadow 0.15s' }}
+                      value={form.doc_prefix}
+                      onChange={e => setForm(p => ({ ...p, doc_prefix: e.target.value }))}>
+                      {settings.documentPrefixes.map(pf => (
+                        <option key={pf} value={pf}>{stripOf(pf)}</option>
+                      ))}
+                    </select>
+                  ) : (
+                    <span style={{ fontSize: 13, color: 'var(--text-2)', fontWeight: 500, flexShrink: 0, whiteSpace: 'nowrap' }}>
+                      {stripOf(settings?.documentPrefixes?.[0] || 'Policy')}
+                    </span>
+                  )}
+                  {/* Plain "of" separator */}
+                  <span style={{ fontSize: 13, color: 'var(--text-3)', flexShrink: 0 }}>of</span>
+                  {/* Date input + Today button */}
+                  <div style={{ position: 'relative', display: 'flex', alignItems: 'center', flex: 1 }}>
+                    <input className="form-input"
+                      type="date"
+                      style={{ width: '100%', padding: '9px 12px', paddingRight: 70, border: '1px solid var(--border-2)', borderRadius: 'var(--r)', background: 'var(--bg)', color: 'var(--text)', fontFamily: 'var(--font-u)', fontSize: 13, outline: 'none', transition: 'border-color 0.15s, box-shadow 0.15s' }}
+                      value={form.date}
+                      onChange={e => setForm(p => ({ ...p, date: e.target.value }))} />
                     <button type="button"
                       onClick={() => setForm(p => ({ ...p, date: new Date().toISOString().split('T')[0] }))}
                       style={{ position: 'absolute', right: 8, background: 'var(--surface-2)', border: '1px solid var(--border-2)', borderRadius: 'calc(var(--r) - 2px)', cursor: 'pointer', color: 'var(--text-2)', fontSize: 10.5, fontWeight: 600, fontFamily: 'var(--font-u)', padding: '3px 7px', whiteSpace: 'nowrap', transition: 'all 0.15s', letterSpacing: '0.02em' }}
@@ -1149,23 +1173,6 @@
                       Today
                     </button>
                   </div>
-                </div>
-                <div>
-                  <label style={lbl}>Document Type</label>
-                  {(settings?.documentPrefixes?.length > 1) ? (
-                    <select className="form-input" style={{ ...inp, cursor: 'pointer' }}
-                      value={form.doc_prefix}
-                      onChange={e => setForm(p => ({ ...p, doc_prefix: e.target.value }))}>
-                      {settings.documentPrefixes.map(pf => (
-                        <option key={pf} value={pf}>{pf}</option>
-                      ))}
-                    </select>
-                  ) : (
-                    <div style={{ ...inp, color: 'var(--text-2)', background: 'var(--surface-2)', cursor: 'default', display: 'flex', alignItems: 'center' }}>
-                      {settings?.documentPrefixes?.[0] || 'Policy of'}
-                      <span style={{ fontSize: 10, color: 'var(--text-3)', marginLeft: 8 }}>— add more in Settings</span>
-                    </div>
-                  )}
                 </div>
               </div>
               {showIssue ? (
@@ -1459,7 +1466,12 @@
         setPolicyModal({ open: false, mode: 'add' });
         await loadCats();
         runSearch({ q: query, s: sel });
-        if (policyModal.mode === 'edit' && saved) { setActivePolicy(saved); setActiveId(saved.id); }
+        if (saved) {
+          const full = await apiGetPolicy(saved.id);
+          setActivePolicy(full || saved);
+          setActiveId(saved.id);
+          setActiveIdx(-1);
+        }
       };
 
       const handleSignOut = async () => {
