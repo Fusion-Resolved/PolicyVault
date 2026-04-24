@@ -736,7 +736,7 @@
                   </div>
                 )}
 
-                {/* Series — centred, directly above title, halved gap */}
+                {/* Series — centred, directly above title, halved gap between items */}
                 {(() => {
                   const seriesEntries = (m.series && m.series.length > 0)
                     ? m.series
@@ -744,7 +744,7 @@
                   return seriesEntries.length > 0 ? (
                     <div style={{ textAlign: 'center', marginBottom: '0.625rem' }}>
                       {seriesEntries.map((s, i) => (
-                        <p key={i} style={{ fontSize: 19.5, color: 'var(--text-2)', fontWeight: 500, letterSpacing: '0.02em', lineHeight: 2 }}>
+                        <p key={i} style={{ fontSize: 19.5, color: 'var(--text-2)', fontWeight: 500, letterSpacing: '0.02em', lineHeight: 1.5 }}>
                           {s.name} Series{s.number ? ` ${s.number}` : ''}
                         </p>
                       ))}
@@ -755,14 +755,15 @@
                 {/* Policy Title — large, centred */}
                 <h1 style={{ fontFamily: 'var(--font-d)', fontSize: 34, fontWeight: 500, lineHeight: 1.22, marginBottom: '2rem', letterSpacing: '-0.02em', textAlign: 'center' }}>{policy.name}</h1>
 
-                {/* Referenced policies — centred, shifted 30% left, type + date + series columns */}
+                {/* Referenced policies — centred, fixed-width type column, label offset left */}
                 {refsLoading && (
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: 'var(--text-3)', fontSize: 12, marginBottom: '1.5rem' }}><I.Spin /> Loading references…</div>
                 )}
                 {!refsLoading && refs.length > 0 && (
                   <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '1.67rem' }}>
-                    <div style={{ transform: 'translateX(-30%)', display: 'inline-block' }}>
-                      <p style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)', marginBottom: '0.4rem' }}>Related Policies:</p>
+                    <div style={{ display: 'inline-block' }}>
+                      {/* Label: "Related " sits left of the type column, "Policies:" sits above it */}
+                      <p style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)', marginBottom: '0.4rem', marginLeft: '-3.5rem' }}>Related Policies:</p>
                       {refs.map((ref) => {
                         const rm = parseContent(ref.content || '');
                         const seriesLabel = ref.primary_category
@@ -770,9 +771,9 @@
                           : '';
                         const refType = m.ref_types?.[ref.id] || '';
                         return (
-                          <div key={ref.id} style={{ display: 'grid', gridTemplateColumns: 'auto 110px 1fr', columnGap: '3rem', marginBottom: '0.15rem' }}>
-                            {/* Row 1: type | date (right-aligned) | series */}
-                            <span style={{ fontSize: 13, color: 'var(--text-2)', lineHeight: 1.7 }}>{refType}</span>
+                          <div key={ref.id} style={{ display: 'grid', gridTemplateColumns: '100px 110px 1fr', columnGap: '3rem', marginBottom: '0.15rem' }}>
+                            {/* Row 1: type (fixed width) | date (right-aligned) | series */}
+                            <span style={{ fontSize: 13, color: 'var(--text-2)', lineHeight: 1.7, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{refType}</span>
                             <span style={{ fontSize: 13, color: 'var(--text-2)', textAlign: 'right', lineHeight: 1.7 }}>{rm.date || ''}</span>
                             <span style={{ fontSize: 13, color: 'var(--text-2)', lineHeight: 1.7 }}>{seriesLabel}</span>
                             {/* Row 2: empty | empty | policy name (clickable) */}
@@ -848,13 +849,9 @@
                 value={refTypes[ref.id] || ''}
                 onChange={e => onChangeRefTypes({ ...refTypes, [ref.id]: e.target.value })}
                 placeholder="e.g. Policy"
-                list="pv-ref-types"
                 style={typeInp}
-                title="Reference type (e.g. Policy, Technical, Legal)"
+                title="Reference type (e.g. Policy, Technical)"
               />
-              <datalist id="pv-ref-types">
-                {['Policy','Technical','Legal','Financial','HR','Operational'].map(t => <option key={t} value={t} />)}
-              </datalist>
               <div style={{ padding: '9px 12px', border: '1px solid var(--border-2)', borderRadius: 'var(--r)', background: 'var(--bg)', fontSize: 13, color: 'var(--text)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, minWidth: 0 }}>
                 <span style={{ fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{ref.name}</span>
                 {ref.primary_category && (
