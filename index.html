@@ -416,12 +416,41 @@
 
     const apiDelete = async (id) => {
       if (!db) return { error: { message: 'Not connected' } };
-      return db.from('policies').delete().eq('id', id);
+      // Remove all policy_references rows that involve this policy (both sides of the FK)
+      // to prevent foreign-key constraint violations before deleting the policy itself.
+      const { error: refErr } = await db
+        .from('policy_references')
+        .delete()
+        .or(`policy_id.eq.${id},referenced_policy_id.eq.${id}`);
+      if (refErr) console.warn('PolicyVault: could not clean policy_references:', refErr.message);
+      const result = await db.from('policies').delete().eq('id', id);
+      if (result.error) console.error('PolicyVault: delete policy error:', result.error.message);
+      return result;
     };
 
     const apiDeleteSeries = async (primary) => {
       if (!db) return { error: { message: 'Not connected' } };
-      return db.from('policies').delete().eq('primary_category', primary);
+      // Collect all policy IDs in this series so we can purge their references first.
+      const { data: seriesPolicies, error: fetchErr } = await db
+        .from('policies')
+        .select('id')
+        .eq('primary_category', primary);
+      if (fetchErr) console.warn('PolicyVault: could not fetch series IDs:', fetchErr.message);
+      if (seriesPolicies && seriesPolicies.length > 0) {
+        const ids = seriesPolicies.map(p => p.id);
+        // Build an OR filter covering every id on both FK columns.
+        const orFilter = ids
+          .map(id => `policy_id.eq.${id},referenced_policy_id.eq.${id}`)
+          .join(',');
+        const { error: refErr } = await db
+          .from('policy_references')
+          .delete()
+          .or(orFilter);
+        if (refErr) console.warn('PolicyVault: could not clean policy_references:', refErr.message);
+      }
+      const result = await db.from('policies').delete().eq('primary_category', primary);
+      if (result.error) console.error('PolicyVault: delete series error:', result.error.message);
+      return result;
     };
 
     // ── Policy HTML generator (for export + print) ──────────────────
@@ -1975,14 +2004,16 @@
       };
 
       const handleDeletePolicy = async (id) => {
-        await apiDelete(id);
+        const { error } = await apiDelete(id);
+        if (error) { alert(`Failed to delete policy: ${error.message}`); return; }
         if (activeId === id) { setActiveId(null); setActivePolicy(null); setActiveIdx(-1); }
         await loadCats();
         runSearch({ q: query, s: sel });
       };
 
       const handleDeleteSeries = async (primary) => {
-        await apiDeleteSeries(primary);
+        const { error } = await apiDeleteSeries(primary);
+        if (error) { alert(`Failed to delete series: ${error.message}`); return; }
         if (activePolicy?.primary_category === primary) { setActiveId(null); setActivePolicy(null); setActiveIdx(-1); }
         await loadCats();
         runSearch({ q: query, s: sel });
