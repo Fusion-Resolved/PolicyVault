@@ -157,6 +157,9 @@
     [data-dark="true"] .primary-btn:hover:not(:disabled) {
       box-shadow: 0 6px 20px rgba(72,179,158,0.3) !important;
     }
+    input[type="date"] { color-scheme: light; }
+    [data-dark="true"] input[type="date"] { color-scheme: dark; }
+    input[type="date"]::-webkit-calendar-picker-indicator { opacity: 0.5; cursor: pointer; }
   </style>
 </head>
 <body>
@@ -197,6 +200,26 @@
       ? new Date(iso).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })
       : '';
 
+    const toISODate = (str) => {
+      if (!str) return '';
+      if (/^\d{4}-\d{2}-\d{2}$/.test(str)) return str;
+      const d = new Date(str);
+      return isNaN(d.getTime()) ? '' : d.toISOString().split('T')[0];
+    };
+    const displayDate = (str) => {
+      if (!str) return str;
+      const d = new Date(str);
+      if (isNaN(d.getTime())) return str; // fallback for legacy text dates
+      return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' });
+    };
+
+    const DEFAULT_SETTINGS = { documentPrefixes: ['Policy of'] };
+    const loadSettings = () => {
+      try { const s = localStorage.getItem('pv-settings'); return s ? { ...DEFAULT_SETTINGS, ...JSON.parse(s) } : DEFAULT_SETTINGS; }
+      catch { return DEFAULT_SETTINGS; }
+    };
+    const saveSettingsToStorage = (s) => { try { localStorage.setItem('pv-settings', JSON.stringify(s)); } catch {} };
+
     const toRoman = (n) => {
       if (!n || n < 1) return '';
       const vals = [1000,900,500,400,100,90,50,40,10,9,5,4,1];
@@ -210,19 +233,19 @@
     const META_START = '__PV_META_START__';
     const META_END   = '__PV_META_END__';
     const parseContent = (raw) => {
-      if (!raw) return { date: '', issue: 0, roles: '', author_name: '', author_role: '', series: [], ref_types: {}, body: '' };
+      if (!raw) return { date: '', issue: 0, doc_prefix: '', roles: '', author_name: '', author_role: '', series: [], ref_types: {}, body: '' };
       const s = raw.indexOf(META_START), e = raw.indexOf(META_END);
       if (s === 0 && e > 0) {
         try {
           const meta = JSON.parse(raw.slice(META_START.length, e));
           const body = raw.slice(e + META_END.length).replace(/^\n/, '');
-          return { ...meta, issue: meta.issue || 0, series: meta.series || [], ref_types: meta.ref_types || {}, body };
+          return { ...meta, issue: meta.issue || 0, doc_prefix: meta.doc_prefix || '', series: meta.series || [], ref_types: meta.ref_types || {}, body };
         } catch {}
       }
-      return { date: '', issue: 0, roles: '', author_name: '', author_role: '', series: [], ref_types: {}, body: raw };
+      return { date: '', issue: 0, doc_prefix: '', roles: '', author_name: '', author_role: '', series: [], ref_types: {}, body: raw };
     };
-    const serializeContent = ({ date, issue, roles, author_name, author_role, series, ref_types, body }) => {
-      const meta = JSON.stringify({ date: date.trim(), issue: issue || 0, roles: roles.trim(), author_name: author_name.trim(), author_role: author_role.trim(), series: series || [], ref_types: ref_types || {} });
+    const serializeContent = ({ date, issue, doc_prefix, roles, author_name, author_role, series, ref_types, body }) => {
+      const meta = JSON.stringify({ date: date.trim(), issue: issue || 0, doc_prefix: doc_prefix || '', roles: roles.trim(), author_name: author_name.trim(), author_role: author_role.trim(), series: series || [], ref_types: ref_types || {} });
       return `${META_START}${meta}${META_END}\n${body}`;
     };
 
@@ -360,6 +383,7 @@
       Kbd:     ({ k }) => <kbd style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', minWidth: 20, height: 20, padding: '0 5px', background: 'var(--surface-3)', border: '1px solid var(--border-2)', borderRadius: 5, fontSize: 10, fontFamily: 'monospace', color: 'var(--text-3)', letterSpacing: 0 }}>{k}</kbd>,
       Grip:    () => <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" stroke="none"><circle cx="9" cy="5" r="1.8"/><circle cx="15" cy="5" r="1.8"/><circle cx="9" cy="12" r="1.8"/><circle cx="15" cy="12" r="1.8"/><circle cx="9" cy="19" r="1.8"/><circle cx="15" cy="19" r="1.8"/></svg>,
       Link:    () => <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>,
+      Settings:() => <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>,
     };
 
     // ── Button ─────────────────────────────────────────────────────
@@ -723,7 +747,7 @@
             {(() => { const m = parseContent(policy.content); return (
               <>
                 <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
-                  {m.date && <p style={{ fontSize: 15, color: 'var(--text-3)', letterSpacing: '0.08em', textTransform: 'uppercase', fontWeight: 600 }}>Policy of {m.date}</p>}
+                  {m.date && <p style={{ fontSize: 15, color: 'var(--text-3)', letterSpacing: '0.08em', textTransform: 'uppercase', fontWeight: 600 }}>{m.doc_prefix || 'Policy of'} {displayDate(m.date)}</p>}
                   {m.issue > 0 && <p style={{ fontSize: 13, color: 'var(--text-3)', fontWeight: 400, marginTop: 4, letterSpacing: '0.04em' }}>Issue {toRoman(m.issue)}</p>}
                 </div>
 
@@ -775,7 +799,7 @@
                             {/* Row 1: type | gap | date (right-aligned) | gap | series */}
                             <span style={{ fontSize: 13, color: 'var(--text-2)', lineHeight: 1.7, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{refType}</span>
                             <span />
-                            <span style={{ fontSize: 13, color: 'var(--text-2)', textAlign: 'right', lineHeight: 1.7 }}>{rm.date || ''}</span>
+                            <span style={{ fontSize: 13, color: 'var(--text-2)', textAlign: 'right', lineHeight: 1.7 }}>{displayDate(rm.date) || ''}</span>
                             <span />
                             <span style={{ fontSize: 13, color: 'var(--text-2)', lineHeight: 1.7 }}>{seriesLabel}</span>
                             {/* Row 2: empty×4 | policy name (clickable) */}
@@ -930,8 +954,72 @@
       );
     };
 
-    const PolicyModal = ({ open, mode, editPolicy, cats, onSave, onClose }) => {
-      const blank = { name: '', body: '', series_entries: [{ name: '', number: '' }], date: '', issue: 0, roles: '', author_name: '', author_role: '' };
+    // ══════════════════════════════════════════════════════════════
+    //  SETTINGS MODAL
+    // ══════════════════════════════════════════════════════════════
+    const SettingsModal = ({ open, settings, onSave, onClose }) => {
+      const [prefixes, setPrefixes] = useState([]);
+      const inp = { width: '100%', padding: '8px 12px', border: '1px solid var(--border-2)', borderRadius: 'var(--r)', background: 'var(--bg)', color: 'var(--text)', fontFamily: 'var(--font-u)', fontSize: 13, outline: 'none', transition: 'border-color 0.15s, box-shadow 0.15s' };
+      const lbl = { fontSize: 10, fontWeight: 700, color: 'var(--text-3)', marginBottom: 6, display: 'block', textTransform: 'uppercase', letterSpacing: '0.09em' };
+
+      useEffect(() => {
+        if (open) setPrefixes([...(settings.documentPrefixes?.length ? settings.documentPrefixes : DEFAULT_SETTINGS.documentPrefixes)]);
+      }, [open, settings]);
+
+      const save = () => {
+        const cleaned = prefixes.map(p => p.trim()).filter(Boolean);
+        const next = { ...settings, documentPrefixes: cleaned.length ? cleaned : DEFAULT_SETTINGS.documentPrefixes };
+        onSave(next);
+        onClose();
+      };
+
+      if (!open) return null;
+      return (
+        <div onClick={e => { if (e.target === e.currentTarget) onClose(); }}
+          style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 200, padding: '1rem', backdropFilter: 'blur(6px)', WebkitBackdropFilter: 'blur(6px)' }}>
+          <div className="slide-up" style={{ background: 'var(--surface)', borderRadius: 'var(--r-lg)', width: '100%', maxWidth: 500, maxHeight: '85vh', display: 'flex', flexDirection: 'column', boxShadow: 'var(--shadow-lg), 0 0 0 1px var(--border)' }}>
+            <div style={{ padding: '16px 22px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
+              <h2 style={{ fontFamily: 'var(--font-d)', fontSize: 24, fontWeight: 400, letterSpacing: '-0.015em' }}>Settings</h2>
+              <button onClick={onClose} className="btn-icon" style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-2)', display: 'flex', padding: 6, borderRadius: 'var(--r)', transition: 'all 0.15s' }}><I.X /></button>
+            </div>
+            <div style={{ flex: 1, overflowY: 'auto', padding: '20px 22px', display: 'flex', flexDirection: 'column', gap: 16 }}>
+              <div>
+                <label style={lbl}>Document Types</label>
+                <p style={{ fontSize: 12, color: 'var(--text-3)', marginBottom: 12, lineHeight: 1.6 }}>
+                  Each option appears in the policy form as the text that precedes the date — e.g. selecting "Technical Letter of" displays "Technical Letter of 10 June 2026".
+                </p>
+                {prefixes.map((p, i) => (
+                  <div key={i} style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: 8, marginBottom: 8, alignItems: 'center' }}>
+                    <input className="form-input" style={inp} value={p}
+                      onChange={e => { const next = [...prefixes]; next[i] = e.target.value; setPrefixes(next); }}
+                      placeholder="e.g. Policy of" />
+                    <button type="button" onClick={() => setPrefixes(prefixes.filter((_, j) => j !== i))}
+                      style={{ background: 'transparent', border: '1px solid var(--border-2)', borderRadius: 'var(--r)', cursor: 'pointer', color: 'var(--text-3)', display: 'flex', alignItems: 'center', justifyContent: 'center', width: 32, height: 32, transition: 'all 0.15s', flexShrink: 0 }}
+                      onMouseEnter={e => { e.currentTarget.style.color = 'var(--danger)'; e.currentTarget.style.borderColor = 'var(--danger)'; }}
+                      onMouseLeave={e => { e.currentTarget.style.color = 'var(--text-3)'; e.currentTarget.style.borderColor = 'var(--border-2)'; }}>
+                      <I.X />
+                    </button>
+                  </div>
+                ))}
+                <button type="button" onClick={() => setPrefixes([...prefixes, ''])}
+                  style={{ background: 'transparent', border: '1px dashed var(--border-2)', borderRadius: 'var(--r)', cursor: 'pointer', color: 'var(--text-3)', display: 'inline-flex', alignItems: 'center', gap: 6, padding: '6px 12px', fontSize: 12, fontFamily: 'var(--font-u)', marginTop: 4, transition: 'all 0.15s' }}
+                  onMouseEnter={e => { e.currentTarget.style.color = 'var(--accent)'; e.currentTarget.style.borderColor = 'var(--accent)'; }}
+                  onMouseLeave={e => { e.currentTarget.style.color = 'var(--text-3)'; e.currentTarget.style.borderColor = 'var(--border-2)'; }}>
+                  <I.Plus /> Add document type
+                </button>
+              </div>
+            </div>
+            <div style={{ padding: '14px 22px', borderTop: '1px solid var(--border)', display: 'flex', justifyContent: 'flex-end', gap: 8, flexShrink: 0 }}>
+              <Btn variant="ghost" onClick={onClose}>Cancel</Btn>
+              <Btn variant="primary" onClick={save}>Save Settings</Btn>
+            </div>
+          </div>
+        </div>
+      );
+    };
+
+    const PolicyModal = ({ open, mode, editPolicy, cats, settings, onSave, onClose }) => {
+      const blank = { name: '', body: '', series_entries: [{ name: '', number: '' }], date: '', issue: 0, doc_prefix: '', roles: '', author_name: '', author_role: '' };
       const [form, setForm]         = useState(blank);
       const [refs, setRefs]         = useState([]);
       const [refTypes, setRefTypes] = useState({});
@@ -953,8 +1041,9 @@
           setForm({
             name:         editPolicy.name || '',
             series_entries,
-            date:         m.date || '',
+            date:         toISODate(m.date) || '',
             issue:        m.issue || 0,
+            doc_prefix:   m.doc_prefix || '',
             roles:        m.roles || '',
             author_name:  m.author_name || '',
             author_role:  m.author_role || '',
@@ -1010,7 +1099,7 @@
 
         const dbForm = {
           name:               form.name.trim(),
-          content:            serializeContent({ date: form.date, issue: finalIssue, roles: form.roles, author_name: form.author_name, author_role: form.author_role, series: form.series_entries, ref_types: refTypes, body: form.body }),
+          content:            serializeContent({ date: form.date, issue: finalIssue, doc_prefix: form.doc_prefix, roles: form.roles, author_name: form.author_name, author_role: form.author_role, series: form.series_entries, ref_types: refTypes, body: form.body }),
           primary_category:   form.series_entries[0]?.name?.trim() || '',
           secondary_category: form.series_entries[0]?.number?.trim() || null,
           tertiary_category:  null,
@@ -1045,11 +1134,30 @@
             </div>
             <div style={{ flex: 1, overflowY: 'auto', padding: '22px 24px', display: 'flex', flexDirection: 'column', gap: 16 }}>
 
-              {/* 1. Policy Date + Issue */}
+              {/* 1. Policy Date + Document Type + Issue */}
               {sectionDivider('Policy Header')}
-              <div>
-                <label style={lbl}>Policy Date</label>
-                <input className="form-input" style={inp} value={form.date} onChange={f('date')} placeholder="e.g. 10 May 26" />
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
+                <div>
+                  <label style={lbl}>Policy Date</label>
+                  <input className="form-input" type="date" style={inp} value={form.date} onChange={e => setForm(p => ({ ...p, date: e.target.value }))} />
+                </div>
+                <div>
+                  <label style={lbl}>Document Type</label>
+                  {(settings?.documentPrefixes?.length > 1) ? (
+                    <select className="form-input" style={{ ...inp, cursor: 'pointer' }}
+                      value={form.doc_prefix}
+                      onChange={e => setForm(p => ({ ...p, doc_prefix: e.target.value }))}>
+                      {settings.documentPrefixes.map(pf => (
+                        <option key={pf} value={pf}>{pf}</option>
+                      ))}
+                    </select>
+                  ) : (
+                    <div style={{ ...inp, color: 'var(--text-2)', background: 'var(--surface-2)', cursor: 'default', display: 'flex', alignItems: 'center' }}>
+                      {settings?.documentPrefixes?.[0] || 'Policy of'}
+                      <span style={{ fontSize: 10, color: 'var(--text-3)', marginLeft: 8 }}>— add more in Settings</span>
+                    </div>
+                  )}
+                </div>
               </div>
               {showIssue ? (
                 <div>
@@ -1262,6 +1370,8 @@
       const [detailLoading, setDetailLoading] = useState(false);
       const [policyModal, setPolicyModal]     = useState({ open: false, mode: 'add' });
       const [usersModal, setUsersModal]       = useState(false);
+      const [settingsModal, setSettingsModal] = useState(false);
+      const [settings, setSettings]           = useState(loadSettings);
       const [userMenu, setUserMenu]           = useState(false);
       const searchRef   = useRef(null);
       const userMenuRef = useRef(null);
@@ -1324,7 +1434,7 @@
       useEffect(() => {
         if (authState !== 'authenticated') return;
         const h = e => {
-          if (policyModal.open || usersModal) return;
+          if (policyModal.open || usersModal || settingsModal) return;
           if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
           if (e.key === 'ArrowDown') { e.preventDefault(); const n = Math.min(activeIdx + 1, policies.length - 1); if (policies[n]) openPolicy(policies[n], n); }
           else if (e.key === 'ArrowUp') { e.preventDefault(); const n = Math.max(0, activeIdx - 1); if (policies[n]) openPolicy(policies[n], n); }
@@ -1382,6 +1492,10 @@
                 style={{ background: 'transparent', border: '1px solid var(--border-2)', cursor: 'pointer', color: 'var(--text-2)', display: 'flex', alignItems: 'center', justifyContent: 'center', width: 32, height: 32, borderRadius: 'var(--r)', transition: 'all 0.15s' }}>
                 {dark ? <I.Sun /> : <I.Moon />}
               </button>
+              <button onClick={() => setSettingsModal(true)} title="Settings" className="btn-icon"
+                style={{ background: 'transparent', border: '1px solid var(--border-2)', cursor: 'pointer', color: 'var(--text-2)', display: 'flex', alignItems: 'center', justifyContent: 'center', width: 32, height: 32, borderRadius: 'var(--r)', transition: 'all 0.15s' }}>
+                <I.Settings />
+              </button>
               <Btn variant="primary" size="sm" onClick={() => setPolicyModal({ open: true, mode: 'add' })}><I.Plus /> New Policy</Btn>
               <div ref={userMenuRef} style={{ position: 'relative' }}>
                 <button onClick={() => setUserMenu(v => !v)} title={profile?.email} className="btn-icon"
@@ -1431,8 +1545,9 @@
             </div>
           </div>
 
-          <PolicyModal open={policyModal.open} mode={policyModal.mode} editPolicy={policyModal.mode === 'edit' ? activePolicy : null} cats={cats} onSave={handleSavePolicy} onClose={() => setPolicyModal(m => ({ ...m, open: false }))} />
+          <PolicyModal open={policyModal.open} mode={policyModal.mode} editPolicy={policyModal.mode === 'edit' ? activePolicy : null} cats={cats} settings={settings} onSave={handleSavePolicy} onClose={() => setPolicyModal(m => ({ ...m, open: false }))} />
           <UserManagementModal open={usersModal} currentUserId={user?.id} onClose={() => setUsersModal(false)} />
+          <SettingsModal open={settingsModal} settings={settings} onSave={s => { setSettings(s); saveSettingsToStorage(s); }} onClose={() => setSettingsModal(false)} />
         </div>
       );
     }
