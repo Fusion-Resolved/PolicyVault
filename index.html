@@ -199,6 +199,27 @@
     const fmtDate = (iso) => iso
       ? new Date(iso).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })
       : '';
+
+    // ── Policy content metadata helpers ───────────────────────────
+    const META_START = '__PV_META_START__';
+    const META_END   = '__PV_META_END__';
+    const parseContent = (raw) => {
+      if (!raw) return { date: '', roles: '', author_name: '', author_role: '', body: '' };
+      const s = raw.indexOf(META_START), e = raw.indexOf(META_END);
+      if (s === 0 && e > 0) {
+        try {
+          const meta = JSON.parse(raw.slice(META_START.length, e));
+          const body = raw.slice(e + META_END.length).replace(/^\n/, '');
+          return { ...meta, body };
+        } catch {}
+      }
+      return { date: '', roles: '', author_name: '', author_role: '', body: raw };
+    };
+    const serializeContent = ({ date, roles, author_name, author_role, body }) => {
+      const meta = JSON.stringify({ date: date.trim(), roles: roles.trim(), author_name: author_name.trim(), author_role: author_role.trim() });
+      return `${META_START}${meta}${META_END}\n${body}`;
+    };
+
     const dedupe = (a, b) => {
       const s = new Set();
       return [...a, ...b].filter(x => { if (s.has(x.id)) return false; s.add(x.id); return true; });
@@ -591,7 +612,7 @@
       return (
         <aside style={{ width: 'var(--sidebar-w)', minWidth: 'var(--sidebar-w)', borderRight: '1px solid var(--border)', overflowY: 'auto', padding: '14px 8px 24px', display: 'flex', flexDirection: 'column', gap: 1 }}>
           <div style={{ fontSize: 9.5, letterSpacing: '0.12em', textTransform: 'uppercase', color: 'var(--text-3)', fontWeight: 700, padding: '2px 12px 10px', display: 'flex', alignItems: 'center', gap: 8 }}>
-            <span>Categories</span>
+            <span>Series</span>
             <div style={{ flex: 1, height: 1, background: 'var(--border-2)' }} />
           </div>
           <button style={rowStyle(!sel.primary)} className="sidebar-row" onClick={() => onSelect({})}>
@@ -614,7 +635,7 @@
                       return (
                         <div key={s} style={{ marginLeft: 16, borderLeft: '1px solid var(--border)' }}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: 1, paddingLeft: 6 }}>
-                            <button style={{ ...rowStyle(isS(p, s)), flex: 1, fontSize: 12 }} className="sidebar-row" onClick={() => { onSelect({ primary: p, secondary: s }); setOpenS(o => ({ ...o, [sk]: true })); }}>{s}</button>
+                            <button style={{ ...rowStyle(isS(p, s)), flex: 1, fontSize: 12 }} className="sidebar-row" onClick={() => { onSelect({ primary: p, secondary: s }); setOpenS(o => ({ ...o, [sk]: true })); }}>Series {s}</button>
                             {terts.length > 0 && <button onClick={() => setOpenS(o => ({ ...o, [sk]: !o[sk] }))} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-3)', padding: '5px 6px', borderRadius: 'var(--r)', display: 'flex' }}>{sOpen ? <I.CDown /> : <I.CRight />}</button>}
                           </div>
                           {sOpen && terts.map(t => <button key={t} style={{ ...rowStyle(isT(p, s, t)), width: 'calc(100% - 6px)', marginLeft: 6, fontSize: 11.5, paddingLeft: 10 }} className="sidebar-row" onClick={() => onSelect({ primary: p, secondary: s, tertiary: t })}>{t}</button>)}
@@ -650,9 +671,11 @@
                 <div style={{ fontWeight: 600, fontSize: 13, color: a ? 'var(--accent-text)' : 'var(--text)', marginBottom: 4, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{p.name}</div>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6 }}>
                   <div style={{ fontSize: 11, color: a ? 'var(--accent)' : 'var(--text-3)', display: 'flex', alignItems: 'center', gap: 3, minWidth: 0, opacity: a ? 0.85 : 1 }}>
-                    <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.primary_category}</span>
-                    {p.secondary_category && <><span style={{ opacity: 0.45 }}>›</span><span>{p.secondary_category}</span></>}
-                    {p.tertiary_category  && <><span style={{ opacity: 0.45 }}>›</span><span>{p.tertiary_category}</span></>}
+                    {p.primary_category && (
+                      <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {p.primary_category}{p.secondary_category ? ` Series ${p.secondary_category}` : ' Series'}
+                      </span>
+                    )}
                   </div>
                   <span style={{ fontSize: 10.5, color: 'var(--text-3)', flexShrink: 0, opacity: 0.75 }}>{fmtDate(p.updated_at)}</span>
                 </div>
@@ -685,40 +708,76 @@
       );
       return (
         <div className="fade-in" style={{ flex: 1, display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
-          <div style={{ padding: '10px 28px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0, gap: 12, background: 'var(--surface)' }}>
-            <div style={{ fontSize: 11, color: 'var(--text-3)', display: 'flex', alignItems: 'center', gap: 5, minWidth: 0 }}>
-              <span style={{ color: 'var(--accent)', fontWeight: 700 }}>{policy.primary_category}</span>
-              {policy.secondary_category && <><span style={{ opacity: 0.35 }}>›</span><span>{policy.secondary_category}</span></>}
-              {policy.tertiary_category  && <><span style={{ opacity: 0.35 }}>›</span><span>{policy.tertiary_category}</span></>}
-            </div>
+          <div style={{ padding: '10px 28px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'flex-end', flexShrink: 0, background: 'var(--surface)' }}>
             <Btn variant="default" size="sm" onClick={() => onEdit(policy)}><I.Edit /> Edit Policy</Btn>
           </div>
-          <div style={{ flex: 1, overflowY: 'auto', padding: '3rem 3.5rem', maxWidth: 800 }}>
-            <h1 style={{ fontFamily: 'var(--font-d)', fontSize: 36, fontWeight: 400, lineHeight: 1.18, marginBottom: '0.5rem', letterSpacing: '-0.025em' }}>{policy.name}</h1>
-            <p style={{ fontSize: 11.5, color: 'var(--text-3)', marginBottom: refs.length > 0 ? '1.5rem' : '3rem', letterSpacing: '0.03em', textTransform: 'uppercase', fontWeight: 500 }}>Last updated {fmtDate(policy.updated_at)}</p>
+          <div style={{ flex: 1, overflowY: 'auto', padding: '3rem 3.5rem', maxWidth: 860 }}>
 
-            {refsLoading && (
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: 'var(--text-3)', fontSize: 12, marginBottom: '3rem' }}><I.Spin /> Loading references…</div>
-            )}
+            {/* Policy Date — centre top */}
+            {(() => { const m = parseContent(policy.content); return (
+              <>
+                <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
+                  {m.date && <p style={{ fontSize: 12, color: 'var(--text-3)', letterSpacing: '0.08em', textTransform: 'uppercase', fontWeight: 600 }}>Policy of {m.date}</p>}
+                </div>
 
-            {!refsLoading && refs.length > 0 && (
-              <div style={{ marginBottom: '3rem', padding: '16px 20px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--r-lg)', display: 'flex', flexDirection: 'column', gap: 8 }}>
-                {refs.map((ref, i) => (
-                  <div key={ref.id} style={{ display: 'flex', alignItems: 'baseline', gap: 10 }}>
-                    <span style={{ fontSize: 11.5, color: 'var(--text-3)', fontWeight: 600, whiteSpace: 'nowrap', minWidth: 170 }}>
-                      Referenced Policy ({i + 1}):
-                    </span>
-                    <button
-                      onClick={() => onNavigate && onNavigate(ref)}
-                      style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--accent)', fontSize: 13.5, fontWeight: 500, textAlign: 'left', fontFamily: 'var(--font-u)', padding: 0, textDecoration: 'underline', textDecorationStyle: 'dotted', textUnderlineOffset: 3, lineHeight: 1.5 }}>
-                      {ref.name}
-                    </button>
+                {/* Roles (left) + Series listing (centre) — two column row */}
+                {(m.roles || policy.primary_category) && (
+                  <div style={{ display: 'flex', gap: '3rem', marginBottom: '2.5rem', alignItems: 'flex-start' }}>
+                    {/* Left: applicable roles */}
+                    {m.roles && (
+                      <div style={{ minWidth: 160, flexShrink: 0 }}>
+                        {m.roles.split(',').map(r => r.trim()).filter(Boolean).map((r, i) => (
+                          <p key={i} style={{ fontSize: 11.5, color: 'var(--text-2)', lineHeight: 2, letterSpacing: '0.01em' }}>{r}</p>
+                        ))}
+                      </div>
+                    )}
+                    {/* Centre: series + number */}
+                    {policy.primary_category && (
+                      <div style={{ flex: 1, textAlign: 'center' }}>
+                        <p style={{ fontSize: 13, color: 'var(--text-2)', fontWeight: 500, letterSpacing: '0.02em', lineHeight: 2 }}>
+                          {policy.primary_category} Series{policy.secondary_category ? ` ${policy.secondary_category}` : ''}
+                        </p>
+                      </div>
+                    )}
                   </div>
-                ))}
-              </div>
-            )}
+                )}
 
-            <div style={{ fontSize: 14.5, lineHeight: 1.95, color: 'var(--text)', whiteSpace: 'pre-wrap', wordBreak: 'break-word', fontWeight: 300, letterSpacing: '0.01em' }}>{policy.content}</div>
+                {/* Policy Title — large, centred */}
+                <h1 style={{ fontFamily: 'var(--font-d)', fontSize: 34, fontWeight: 500, lineHeight: 1.22, marginBottom: '2.5rem', letterSpacing: '-0.02em', textAlign: 'center' }}>{policy.name}</h1>
+
+                {/* Referenced policies */}
+                {refsLoading && (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: 'var(--text-3)', fontSize: 12, marginBottom: '2rem' }}><I.Spin /> Loading references…</div>
+                )}
+                {!refsLoading && refs.length > 0 && (
+                  <div style={{ marginBottom: '2rem', padding: '16px 20px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--r-lg)', display: 'flex', flexDirection: 'column', gap: 8 }}>
+                    {refs.map((ref, i) => (
+                      <div key={ref.id} style={{ display: 'flex', alignItems: 'baseline', gap: 10 }}>
+                        <span style={{ fontSize: 11.5, color: 'var(--text-3)', fontWeight: 600, whiteSpace: 'nowrap', minWidth: 170 }}>Referenced Policy ({i + 1}):</span>
+                        <button onClick={() => onNavigate && onNavigate(ref)}
+                          style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--accent)', fontSize: 13.5, fontWeight: 500, textAlign: 'left', fontFamily: 'var(--font-u)', padding: 0, textDecoration: 'underline', textDecorationStyle: 'dotted', textUnderlineOffset: 3, lineHeight: 1.5 }}>
+                          {ref.name}
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* Body — left aligned */}
+                <div style={{ fontSize: 14.5, lineHeight: 1.95, color: 'var(--text)', whiteSpace: 'pre-wrap', wordBreak: 'break-word', fontWeight: 300, letterSpacing: '0.01em', marginBottom: '3rem' }}>{m.body}</div>
+
+                {/* Author — right margin */}
+                {(m.author_name || m.author_role) && (
+                  <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '1rem', paddingTop: '1.5rem', borderTop: '1px solid var(--border)' }}>
+                    <div style={{ textAlign: 'right' }}>
+                      {m.author_name && <p style={{ fontSize: 14, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--text)', lineHeight: 1.4 }}>{m.author_name}</p>}
+                      {m.author_role && <p style={{ fontSize: 11.5, fontWeight: 600, letterSpacing: '0.09em', textTransform: 'uppercase', color: 'var(--text-2)', marginTop: 3 }}>{m.author_role}</p>}
+                    </div>
+                  </div>
+                )}
+              </>
+            ); })()}
+
           </div>
         </div>
       );
@@ -820,7 +879,7 @@
     };
 
     const PolicyModal = ({ open, mode, editPolicy, cats, onSave, onClose }) => {
-      const blank = { name: '', content: '', primary_category: '', secondary_category: '', tertiary_category: '' };
+      const blank = { name: '', body: '', series_name: '', series_number: '', date: '', roles: '', author_name: '', author_role: '' };
       const [form, setForm] = useState(blank);
       const [refs, setRefs] = useState([]);
       const [saving, setSaving] = useState(false);
@@ -829,21 +888,41 @@
 
       useEffect(() => {
         if (!open) return;
-        setForm(mode === 'edit' && editPolicy ? { name: editPolicy.name || '', content: editPolicy.content || '', primary_category: editPolicy.primary_category || '', secondary_category: editPolicy.secondary_category || '', tertiary_category: editPolicy.tertiary_category || '' } : blank);
-        setErr(''); setSaving(false); setRefs([]);
-        if (mode === 'edit' && editPolicy?.id) {
+        if (mode === 'edit' && editPolicy) {
+          const m = parseContent(editPolicy.content || '');
+          setForm({
+            name:         editPolicy.name || '',
+            series_name:  editPolicy.primary_category || '',
+            series_number: editPolicy.secondary_category || '',
+            date:         m.date || '',
+            roles:        m.roles || '',
+            author_name:  m.author_name || '',
+            author_role:  m.author_role || '',
+            body:         m.body || '',
+          });
           apiGetReferences(editPolicy.id).then(setRefs);
+        } else {
+          setForm(blank);
+          setRefs([]);
         }
+        setErr(''); setSaving(false);
         setTimeout(() => nameRef.current?.focus(), 50);
       }, [open]);
 
       const f = k => e => setForm(p => ({ ...p, [k]: e.target.value }));
       const save = async () => {
-        if (!form.name.trim())             { setErr('Policy name is required.'); return; }
-        if (!form.primary_category.trim()) { setErr('Primary category is required.'); return; }
-        if (!form.content.trim())          { setErr('Policy content is required.'); return; }
+        if (!form.name.trim())        { setErr('Policy title is required.'); return; }
+        if (!form.series_name.trim()) { setErr('Series name is required.'); return; }
+        if (!form.body.trim())        { setErr('Policy content is required.'); return; }
         setSaving(true); setErr('');
-        const { data, error } = await apiSave(form, mode === 'edit' ? editPolicy.id : null);
+        const dbForm = {
+          name:               form.name.trim(),
+          content:            serializeContent({ date: form.date, roles: form.roles, author_name: form.author_name, author_role: form.author_role, body: form.body }),
+          primary_category:   form.series_name.trim(),
+          secondary_category: form.series_number.trim() || null,
+          tertiary_category:  null,
+        };
+        const { data, error } = await apiSave(dbForm, mode === 'edit' ? editPolicy.id : null);
         if (error) { setErr(error.message); setSaving(false); return; }
         await apiSaveReferences(data.id, refs.map(r => r.id));
         setSaving(false);
@@ -853,6 +932,12 @@
       if (!open) return null;
       const inp = { width: '100%', padding: '9px 12px', border: '1px solid var(--border-2)', borderRadius: 'var(--r)', background: 'var(--bg)', color: 'var(--text)', fontFamily: 'var(--font-u)', fontSize: 13, outline: 'none', transition: 'border-color 0.15s, box-shadow 0.15s' };
       const lbl = { fontSize: 10, fontWeight: 700, color: 'var(--text-3)', marginBottom: 6, display: 'block', textTransform: 'uppercase', letterSpacing: '0.09em' };
+      const sectionDivider = (label) => (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 4 }}>
+          <span style={{ fontSize: 9.5, letterSpacing: '0.12em', textTransform: 'uppercase', fontWeight: 700, color: 'var(--text-3)', whiteSpace: 'nowrap' }}>{label}</span>
+          <div style={{ flex: 1, height: 1, background: 'var(--border-2)' }} />
+        </div>
+      );
 
       return (
         <div onClick={e => { if (e.target === e.currentTarget) onClose(); }} onKeyDown={e => { if (e.key === 'Escape') onClose(); if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') save(); }}
@@ -865,14 +950,65 @@
                 <button onClick={onClose} className="btn-icon" style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-2)', display: 'flex', padding: 6, borderRadius: 'var(--r)', transition: 'all 0.15s' }}><I.X /></button>
               </div>
             </div>
-            <div style={{ flex: 1, overflowY: 'auto', padding: '22px 24px', display: 'flex', flexDirection: 'column', gap: 18 }}>
-              <div><label style={lbl}>Policy Name *</label><input ref={nameRef} className="form-input" style={inp} value={form.name} onChange={f('name')} placeholder="e.g. Acceptable Use Policy" /></div>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 14 }}>
-                <div><label style={lbl}>Primary *</label><input className="form-input" style={inp} list="pv-p" value={form.primary_category} onChange={f('primary_category')} placeholder="e.g. HR" /><datalist id="pv-p">{cats.primaries.map(c => <option key={c} value={c} />)}</datalist></div>
-                <div><label style={lbl}>Secondary</label><input className="form-input" style={inp} list="pv-s" value={form.secondary_category} onChange={f('secondary_category')} placeholder="e.g. Conduct" /><datalist id="pv-s">{(cats.byPrimary[form.primary_category] || []).map(c => <option key={c} value={c} />)}</datalist></div>
-                <div><label style={lbl}>Tertiary</label><input className="form-input" style={inp} list="pv-t" value={form.tertiary_category} onChange={f('tertiary_category')} placeholder="e.g. Disciplinary" /><datalist id="pv-t">{(cats.bySecondary[`${form.primary_category}||${form.secondary_category}`] || []).map(c => <option key={c} value={c} />)}</datalist></div>
+            <div style={{ flex: 1, overflowY: 'auto', padding: '22px 24px', display: 'flex', flexDirection: 'column', gap: 16 }}>
+
+              {/* 1. Policy Date */}
+              {sectionDivider('Policy Header')}
+              <div>
+                <label style={lbl}>Policy Date</label>
+                <input className="form-input" style={inp} value={form.date} onChange={f('date')} placeholder="e.g. 10 May 26" />
               </div>
-              <div style={{ flex: 1 }}><label style={lbl}>Policy Content *</label><textarea className="form-input" style={{ ...inp, minHeight: 260, resize: 'vertical', lineHeight: 1.8, fontWeight: 300 }} value={form.content} onChange={f('content')} placeholder="Enter the full policy text…" /></div>
+
+              {/* 2. Applicable Roles */}
+              <div>
+                <label style={lbl}>Applicable To</label>
+                <input className="form-input" style={inp} value={form.roles} onChange={f('roles')} placeholder="e.g. Executives, Accountants, Legal Advisors" />
+                <p style={{ fontSize: 11, color: 'var(--text-3)', marginTop: 5 }}>Comma-separated list — displayed in the left margin</p>
+              </div>
+
+              {/* 3. Series */}
+              {sectionDivider('Series')}
+              <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 14 }}>
+                <div>
+                  <label style={lbl}>Series Name *</label>
+                  <input className="form-input" style={inp} list="pv-series" value={form.series_name} onChange={f('series_name')} placeholder="e.g. Finance" />
+                  <datalist id="pv-series">{cats.primaries.map(c => <option key={c} value={c} />)}</datalist>
+                </div>
+                <div>
+                  <label style={lbl}>Series Number</label>
+                  <input className="form-input" style={inp} value={form.series_number} onChange={f('series_number')} placeholder="e.g. 6" />
+                </div>
+              </div>
+
+              {/* 4. Policy Title */}
+              {sectionDivider('Policy Title')}
+              <div>
+                <label style={lbl}>Title *</label>
+                <input ref={nameRef} className="form-input" style={{ ...inp, fontSize: 15, fontFamily: 'var(--font-d)', fontWeight: 500 }} value={form.name} onChange={f('name')} placeholder="e.g. Central Centralise Oversight with an Asset Control Ledger" />
+              </div>
+
+              {/* 5. Policy Body */}
+              {sectionDivider('Policy Content')}
+              <div>
+                <label style={lbl}>Body *</label>
+                <textarea className="form-input" style={{ ...inp, minHeight: 220, resize: 'vertical', lineHeight: 1.8, fontWeight: 300 }} value={form.body} onChange={f('body')} placeholder="Enter the full policy text…" />
+              </div>
+
+              {/* 6. Author */}
+              {sectionDivider('Author')}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
+                <div>
+                  <label style={lbl}>Author Name</label>
+                  <input className="form-input" style={{ ...inp, textTransform: 'uppercase' }} value={form.author_name} onChange={f('author_name')} placeholder="e.g. JOHN SMITH" />
+                </div>
+                <div>
+                  <label style={lbl}>Author Role</label>
+                  <input className="form-input" style={{ ...inp, textTransform: 'uppercase' }} value={form.author_role} onChange={f('author_role')} placeholder="e.g. CHIEF EXECUTIVE OFFICER" />
+                </div>
+              </div>
+              <p style={{ fontSize: 11, color: 'var(--text-3)', marginTop: -8 }}>Displayed in capitals at the end of the policy, right-aligned</p>
+
+              {/* 7. Referenced Policies */}
               <div style={{ borderTop: '1px solid var(--border)', paddingTop: 18 }}>
                 <ReferencedPoliciesEditor
                   currentPolicyId={mode === 'edit' ? editPolicy?.id : null}
@@ -880,6 +1016,7 @@
                   onChange={setRefs}
                 />
               </div>
+
               {err && <div style={{ fontSize: 13, color: 'var(--danger)', background: 'var(--danger-bg)', padding: '9px 13px', borderRadius: 'var(--r)', borderLeft: '3px solid var(--danger)' }}>{err}</div>}
             </div>
             <div style={{ padding: '14px 22px', borderTop: '1px solid var(--border)', display: 'flex', justifyContent: 'flex-end', gap: 8, flexShrink: 0 }}>
