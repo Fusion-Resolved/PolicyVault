@@ -330,7 +330,7 @@
     const demoteUser  = (id) => db.from('user_profiles').update({ role: 'user'  }).eq('id', id);
 
     // ── Policies helpers ───────────────────────────────────────────
-    const COLS = 'id,name,primary_category,secondary_category,tertiary_category,updated_at';
+    const COLS = 'id,name,primary_category,secondary_category,tertiary_category,updated_at,content';
 
     const apiSearch = async ({ query = '', primary = '', secondary = '', tertiary = '' } = {}) => {
       if (!db) return [];
@@ -1042,13 +1042,23 @@
 
                   {/* Main clickable area */}
                   <div onClick={() => onSelect(p, policies.indexOf(p))} style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontWeight: 600, fontSize: 13, color: a ? 'var(--accent-text)' : 'var(--text)', marginBottom: 4, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{p.name}</div>
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6 }}>
-                      <div style={{ fontSize: 11, color: a ? 'var(--accent)' : 'var(--text-3)', minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', opacity: a ? 0.85 : 1 }}>
-                        {p.primary_category && `${p.primary_category}${p.secondary_category ? ` Series ${p.secondary_category}` : ' Series'}`}
-                      </div>
-                      <span style={{ fontSize: 10.5, color: 'var(--text-3)', flexShrink: 0, opacity: 0.75 }}>{fmtDate(p.updated_at)}</span>
-                    </div>
+                    {(() => {
+                      const meta = parseContent(p.content || '');
+                      const docType = stripOf(meta.doc_prefix || 'Policy');
+                      const policyDate = meta.date ? fmtDate(meta.date) : '';
+                      return (<>
+                        <div style={{ display: 'flex', alignItems: 'baseline', gap: 6, marginBottom: 3, minWidth: 0 }}>
+                          <div style={{ fontWeight: 600, fontSize: 13, color: a ? 'var(--accent-text)' : 'var(--text)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', flex: 1, minWidth: 0 }}>{p.name}</div>
+                          <span style={{ fontSize: 9.5, fontWeight: 700, color: a ? 'var(--accent)' : 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '0.07em', flexShrink: 0, opacity: a ? 1 : 0.8 }}>{docType}</span>
+                        </div>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6 }}>
+                          <div style={{ fontSize: 11, color: a ? 'var(--accent)' : 'var(--text-3)', minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', opacity: a ? 0.85 : 1 }}>
+                            {p.primary_category && `${p.primary_category}${p.secondary_category ? ` Series ${p.secondary_category}` : ' Series'}`}
+                          </div>
+                          {policyDate && <span style={{ fontSize: 10.5, color: 'var(--text-3)', flexShrink: 0, opacity: 0.75 }}>{policyDate}</span>}
+                        </div>
+                      </>);
+                    })()}
                   </div>
 
                   {/* Three-dot button */}
