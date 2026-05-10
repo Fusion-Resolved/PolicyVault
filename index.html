@@ -149,7 +149,6 @@
       background: rgba(22,24,20,0.88);
     }
 
-    /* Form elements */
     .form-input:focus {
       border-color: var(--accent) !important;
       box-shadow: 0 0 0 3px var(--accent-muted) !important;
@@ -160,40 +159,52 @@
     input[type="date"] { color-scheme: light; }
     [data-dark="true"] input[type="date"] { color-scheme: dark; }
 
-    /* Policy doc */
     .policy-doc { font-family: var(--font-policy, var(--font-d)); color: var(--policy-text-color, var(--text)); }
     .policy-doc-size { font-size: var(--font-policy-size, 14.5px); }
 
-    /* Mobile tap states */
     .tap-row { -webkit-tap-highlight-color: transparent; transition: background 0.1s; }
     .tap-row:active { background: var(--surface-2) !important; }
 
-    /* Bottom nav */
     .nav-btn { -webkit-tap-highlight-color: transparent; transition: color 0.15s, transform 0.1s; }
     .nav-btn:active { transform: scale(0.92); }
 
-    /* Series cards */
     .series-card { -webkit-tap-highlight-color: transparent; transition: all 0.14s cubic-bezier(0.22,1,0.36,1); }
     .series-card:active { transform: scale(0.97); background: var(--surface-2) !important; }
 
-    /* Settings tabs */
     .settings-tab { transition: background 0.15s, color 0.15s; }
     .settings-tab:hover { background: var(--surface-3) !important; }
     .settings-tab.active { background: var(--surface) !important; color: var(--text) !important; box-shadow: var(--shadow-sm); }
 
-    /* Action menu */
     .action-menu-item { width: 100%; text-align: left; padding: 13px 18px; background: transparent; border: none; cursor: pointer; font-size: 15px; color: var(--text); display: flex; align-items: center; gap: 12px; font-family: var(--font-u); transition: background 0.1s; -webkit-tap-highlight-color: transparent; }
     .action-menu-item:active { background: var(--surface-2); }
     .action-menu-item.danger { color: var(--danger); }
     .action-menu-item.danger:active { background: var(--danger-bg); }
 
-    /* Primary button */
     .primary-btn { transition: all 0.16s cubic-bezier(0.22,1,0.36,1) !important; }
     .primary-btn:active:not(:disabled) { transform: scale(0.97) !important; }
+
+    /* ── Desktop layout ──────────────────────────────────────── */
+    .desktop-root { height: 100dvh; display: flex; flex-direction: column; overflow: hidden; }
+    .desktop-topbar { height: 52px; border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 14px; padding: 0 20px; flex-shrink: 0; background: var(--surface); }
+    .desktop-body { flex: 1; display: grid; grid-template-columns: 230px 310px 1fr; overflow: hidden; }
+    .desktop-sidebar { overflow-y: auto; border-right: 1px solid var(--border); background: var(--bg); }
+    .desktop-list { overflow-y: auto; border-right: 1px solid var(--border); background: var(--surface); }
+    .desktop-detail { overflow-y: auto; background: var(--bg); }
+    .desktop-sidebar-item { width: 100%; text-align: left; padding: 10px 16px; background: transparent; border: none; cursor: pointer; font-family: var(--font-u); font-size: 13.5px; color: var(--text-2); display: flex; align-items: center; gap: 10px; border-radius: var(--r); transition: background 0.12s, color 0.12s; }
+    .desktop-sidebar-item:hover { background: var(--surface-2); color: var(--text); }
+    .desktop-sidebar-item.active { background: var(--accent-muted); color: var(--accent); font-weight: 700; }
+    .desktop-list-item { width: 100%; text-align: left; padding: 14px 18px; background: transparent; border: none; border-bottom: 1px solid var(--border); cursor: pointer; font-family: var(--font-u); display: block; transition: background 0.1s; }
+    .desktop-list-item:hover { background: var(--surface-2); }
+    .desktop-list-item.active { background: var(--accent-muted); }
+    .desktop-search-input { flex: 1; max-width: 340px; padding: 7px 13px 7px 34px; border: 1px solid var(--border-2); border-radius: var(--r-lg); background: var(--surface-2); color: var(--text); font-family: var(--font-u); font-size: 13px; outline: none; transition: border-color 0.15s, box-shadow 0.15s; }
+    .desktop-search-input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-muted); }
+    .desktop-icon-btn { width: 34px; height: 34px; border-radius: var(--r); background: transparent; border: 1px solid var(--border-2); cursor: pointer; color: var(--text-2); display: flex; align-items: center; justify-content: center; transition: background 0.12s, color 0.12s; }
+    .desktop-icon-btn:hover { background: var(--surface-2); color: var(--text); }
 
     @media print {
       body::after { display: none; }
       .pwa-header, .pwa-bottom-nav, .pwa-fab { display: none !important; }
+      .desktop-topbar, .desktop-sidebar, .desktop-list { display: none !important; }
     }
   </style>
 </head>
@@ -209,8 +220,8 @@
     const { useState, useEffect, useCallback, useRef, useMemo } = React;
 
     // ── Configuration ──────────────────────────────────────────────
-    const SUPABASE_URL      = 'https://gcbstllhgwwvcjxcmyfd.supabase.co';
-    const SUPABASE_ANON_KEY = 'sb_publishable_8giHceQEae5jy7EEAG4NQw_mVYWBuN1';
+    const SUPABASE_URL      = '__SUPABASE_URL__';
+    const SUPABASE_ANON_KEY = '__SUPABASE_ANON_KEY__';
 
     const configured = SUPABASE_URL.startsWith('https://') && SUPABASE_ANON_KEY.length > 20;
     const db = configured
@@ -256,6 +267,7 @@
       const vals=[1000,900,500,400,100,90,50,40,10,9,5,4,1], syms=['M','CM','D','CD','C','XC','L','XL','X','IX','V','IV','I'];
       let r='', num=n; vals.forEach((v,i)=>{ while(num>=v){r+=syms[i]; num-=v;} }); return r;
     };
+    const initials = (email='') => { const p=email.split('@')[0].split(/[._-]/); return p.slice(0,2).map(x=>x[0]?.toUpperCase()||'').join('')||'?'; };
 
     // ── Content helpers ────────────────────────────────────────────
     const META_START = '__PV_META_START__';
@@ -279,20 +291,20 @@
 
     const dedupe = (a, b) => { const s=new Set(); return [...a,...b].filter(x=>{ if(s.has(x.id)) return false; s.add(x.id); return true; }); };
     const setArr = (s) => [...s].sort((a,b)=>a.localeCompare(b));
-    const initials = (email='') => { const p=email.split('@')[0].split(/[._-]/); return p.slice(0,2).map(x=>x[0]?.toUpperCase()||'').join('')||'?'; };
 
     // ── Auth helpers ───────────────────────────────────────────────
     const authSignIn  = (e,p) => db.auth.signInWithPassword({ email: e, password: p });
     const authSignUp  = (e,p) => db.auth.signUp({ email: e, password: p });
     const authSignOut = ()    => db.auth.signOut();
     const getAllProfiles = async () => { const {data} = await db.from('user_profiles').select('*').order('created_at',{ascending:false}); return data||[]; };
+    const getApprovedUsers = async () => { const {data} = await db.from('user_profiles').select('id,email,full_name').eq('approved',true).order('email'); return data||[]; };
     const approveUser = (id) => db.rpc('approve_user',{target_id:id});
     const revokeUser  = (id) => db.rpc('revoke_user', {target_id:id});
     const promoteUser = (id) => db.from('user_profiles').update({role:'admin'}).eq('id',id);
     const demoteUser  = (id) => db.from('user_profiles').update({role:'user'}).eq('id',id);
 
     // ── API helpers ────────────────────────────────────────────────
-    const COLS = 'id,name,primary_category,secondary_category,tertiary_category,updated_at,content';
+    const COLS = 'id,name,primary_category,secondary_category,tertiary_category,updated_at,content,visibility,owner_id';
 
     const apiSearch = async ({ query='', primary='', secondary='', tertiary='' }={}) => {
       if (!db) return [];
@@ -324,8 +336,16 @@
       });
       return { primaries: setArr(pS), byPrimary: Object.fromEntries(Object.entries(byP).map(([k,v])=>[k,setArr(v)])), bySecondary: Object.fromEntries(Object.entries(byS).map(([k,v])=>[k,setArr(v)])) };
     };
-    const apiSave = async (form, id=null) => {
-      const p = { name:form.name.trim(), content:form.content.trim(), primary_category:form.primary_category.trim(), secondary_category:form.secondary_category?.trim()||null, tertiary_category:form.tertiary_category?.trim()||null };
+    const apiSave = async (form, id=null, userId=null) => {
+      const p = {
+        name: form.name.trim(),
+        content: form.content.trim(),
+        primary_category: form.primary_category.trim(),
+        secondary_category: form.secondary_category?.trim()||null,
+        tertiary_category: form.tertiary_category?.trim()||null,
+        visibility: form.visibility || 'family',
+      };
+      if (!id && userId) p.owner_id = userId;
       if (id) return db.from('policies').update(p).eq('id',id).select().single();
       return db.from('policies').insert(p).select().single();
     };
@@ -341,9 +361,22 @@
         await db.from('policy_references').insert(referencedIds.map((refId,i)=>({ policy_id:policyId, referenced_policy_id:refId, order_index:i })));
       }
     };
+    const apiGetShares = async (policyId) => {
+      if (!db) return [];
+      const {data} = await db.from('policy_shares').select('user_id,can_edit').eq('policy_id',policyId);
+      return data||[];
+    };
+    const apiSaveShares = async (policyId, shares) => {
+      if (!db) return;
+      await db.from('policy_shares').delete().eq('policy_id',policyId);
+      if (shares.length>0) {
+        await db.from('policy_shares').insert(shares.map(s=>({policy_id:policyId, user_id:s.user_id, can_edit:s.can_edit||false})));
+      }
+    };
     const apiDelete = async (id) => {
       if (!db) return {error:{message:'Not connected'}};
       await db.from('policy_references').delete().or(`policy_id.eq.${id},referenced_policy_id.eq.${id}`);
+      await db.from('policy_shares').delete().eq('policy_id',id);
       return db.from('policies').delete().eq('id',id);
     };
     const apiDeleteSeries = async (primary) => {
@@ -367,9 +400,7 @@
       return `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><title>${esc(policy.name)}</title><style>${css}</style></head><body><div class="wrap">${metaHtml}${series}<h1>${esc(policy.name)}</h1>${refsHtml}<div class="body">${esc(m.body)}</div>${authorHtml}</div></body></html>`;
     };
 
-    // ══════════════════════════════════════════════════════════════
-    //  ICONS
-    // ══════════════════════════════════════════════════════════════
+    // ── Icons ──────────────────────────────────────────────────────
     const I = {
       Search:   () => <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>,
       SearchSm: () => <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>,
@@ -397,11 +428,73 @@
       Eye:      () => <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>,
       EyeOff:   () => <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>,
       Lock:     () => <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="1.6" strokeLinecap="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/><circle cx="12" cy="16" r="1.2" fill="white" stroke="none"/></svg>,
+      LockSm:   () => <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>,
+      Globe:    () => <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>,
+      UserPlus: () => <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="8.5" cy="7" r="4"/><line x1="20" y1="8" x2="20" y2="14"/><line x1="23" y1="11" x2="17" y2="11"/></svg>,
       Kbd:      ({k}) => <kbd style={{display:'inline-flex',alignItems:'center',justifyContent:'center',minWidth:20,height:20,padding:'0 5px',background:'var(--surface-3)',border:'1px solid var(--border-2)',borderRadius:5,fontSize:10,fontFamily:'monospace',color:'var(--text-3)',letterSpacing:0}}>{k}</kbd>,
       Grip:     () => <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" stroke="none"><circle cx="9" cy="5" r="1.8"/><circle cx="15" cy="5" r="1.8"/><circle cx="9" cy="12" r="1.8"/><circle cx="15" cy="12" r="1.8"/><circle cx="9" cy="19" r="1.8"/><circle cx="15" cy="19" r="1.8"/></svg>,
       Link:     () => <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>,
       Settings: () => <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>,
       CRight:   () => <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><path d="m9 18 6-6-6-6"/></svg>,
+    };
+
+    // ── Visibility Badge ───────────────────────────────────────────
+    const VisibilityBadge = ({ visibility, small }) => {
+      if (!visibility || visibility === 'family') return null;
+      const cfg = {
+        private: { icon: <I.LockSm/>, label: 'Private', color: 'var(--amber)', bg: 'var(--amber-bg)' },
+        shared:  { icon: <I.UserPlus/>, label: 'Shared',  color: 'var(--accent)', bg: 'var(--accent-bg)' },
+      };
+      const c = cfg[visibility];
+      if (!c) return null;
+      return (
+        <span style={{display:'inline-flex',alignItems:'center',gap:3,padding:small?'2px 6px':'3px 8px',borderRadius:100,background:c.bg,color:c.color,fontSize:small?9.5:10.5,fontWeight:700,letterSpacing:'0.04em',flexShrink:0,border:`1px solid ${c.color}22`}}>
+          {c.icon}&nbsp;{c.label}
+        </span>
+      );
+    };
+
+    // ── Share Picker ───────────────────────────────────────────────
+    const SharePicker = ({ currentUserId, shares, onChangeShares }) => {
+      const [allUsers, setAllUsers] = useState([]);
+      const [loading, setLoading] = useState(true);
+      useEffect(() => {
+        getApprovedUsers().then(u => { setAllUsers(u.filter(x => x.id !== currentUserId)); setLoading(false); });
+      }, [currentUserId]);
+      const toggle = (userId) => {
+        const exists = shares.find(s => s.user_id === userId);
+        if (exists) onChangeShares(shares.filter(s => s.user_id !== userId));
+        else onChangeShares([...shares, { user_id: userId, can_edit: false }]);
+      };
+      const toggleEdit = (userId) => {
+        onChangeShares(shares.map(s => s.user_id === userId ? { ...s, can_edit: !s.can_edit } : s));
+      };
+      if (loading) return <div style={{color:'var(--text-3)',fontSize:12,display:'flex',alignItems:'center',gap:6}}><I.Spin/> Loading users…</div>;
+      if (allUsers.length === 0) return <div style={{color:'var(--text-3)',fontSize:12}}>No other approved users found.</div>;
+      return (
+        <div style={{border:'1px solid var(--border-2)',borderRadius:'var(--r)',overflow:'hidden'}}>
+          {allUsers.map((u, idx) => {
+            const granted = shares.find(s => s.user_id === u.id);
+            return (
+              <div key={u.id} style={{display:'flex',alignItems:'center',gap:12,padding:'10px 14px',borderBottom:idx<allUsers.length-1?'1px solid var(--border)':'none',background:granted?'var(--accent-muted)':'transparent',transition:'background 0.12s'}}>
+                <div style={{width:32,height:32,borderRadius:'50%',background:granted?'var(--accent-bg)':'var(--surface-2)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:11,fontWeight:700,color:granted?'var(--accent)':'var(--text-3)',flexShrink:0}}>{initials(u.email)}</div>
+                <div style={{flex:1,minWidth:0}}>
+                  <div style={{fontSize:13,fontWeight:500,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{u.full_name||u.email.split('@')[0]}</div>
+                  <div style={{fontSize:11,color:'var(--text-3)',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{u.email}</div>
+                </div>
+                {granted && (
+                  <button type="button" onClick={()=>toggleEdit(u.id)} style={{fontSize:10,padding:'3px 8px',background:granted.can_edit?'var(--accent)':'var(--surface-3)',color:granted.can_edit?'#fff':'var(--text-3)',border:'none',borderRadius:100,cursor:'pointer',fontFamily:'var(--font-u)',fontWeight:700,letterSpacing:'0.04em',flexShrink:0}}>
+                    {granted.can_edit ? 'Can Edit' : 'View only'}
+                  </button>
+                )}
+                <button type="button" onClick={()=>toggle(u.id)} style={{width:22,height:22,borderRadius:6,border:`2px solid ${granted?'var(--accent)':'var(--border-2)'}`,background:granted?'var(--accent)':'transparent',display:'flex',alignItems:'center',justifyContent:'center',cursor:'pointer',flexShrink:0,transition:'all 0.14s'}}>
+                  {granted && <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3" strokeLinecap="round"><polyline points="20 6 9 17 4 12"/></svg>}
+                </button>
+              </div>
+            );
+          })}
+        </div>
+      );
     };
 
     // ── Button ─────────────────────────────────────────────────────
@@ -418,9 +511,7 @@
       return <button onClick={onClick} disabled={disabled} title={title} className={variant==='primary'?'primary-btn':''} style={{...base,...sz[size],...vr[variant],...sx}}>{children}</button>;
     };
 
-    // ══════════════════════════════════════════════════════════════
-    //  AUTH PAGES  (unchanged)
-    // ══════════════════════════════════════════════════════════════
+    // ── Auth Pages ─────────────────────────────────────────────────
     const AuthPage = ({ dark, onToggleDark }) => {
       const [mode,setMode]=useState('signin'), [email,setEmail]=useState(''), [pw,setPw]=useState(''), [pw2,setPw2]=useState(''), [showPw,setShowPw]=useState(false), [loading,setLoading]=useState(false), [err,setErr]=useState(''), [ok,setOk]=useState('');
       const emailRef=useRef(null);
@@ -442,9 +533,7 @@
             <div style={{position:'absolute',top:'-15%',right:'-8%',width:'55vw',height:'55vw',borderRadius:'50%',background:'radial-gradient(circle, var(--accent-bg) 0%, transparent 68%)',opacity:0.7}}/>
             <div style={{position:'absolute',bottom:'-12%',left:'-4%',width:'38vw',height:'38vw',borderRadius:'50%',background:'radial-gradient(circle, var(--accent-muted) 0%, transparent 70%)',opacity:0.5}}/>
           </div>
-          <button onClick={onToggleDark} style={{position:'absolute',top:20,right:20,background:'var(--surface)',border:'1px solid var(--border-2)',cursor:'pointer',color:'var(--text-2)',display:'flex',alignItems:'center',justifyContent:'center',width:38,height:38,borderRadius:'var(--r)',boxShadow:'var(--shadow-sm)',WebkitTapHighlightColor:'transparent'}}>
-            {dark?<I.Sun/>:<I.Moon/>}
-          </button>
+          <button onClick={onToggleDark} style={{position:'absolute',top:20,right:20,background:'var(--surface)',border:'1px solid var(--border-2)',cursor:'pointer',color:'var(--text-2)',display:'flex',alignItems:'center',justifyContent:'center',width:38,height:38,borderRadius:'var(--r)',boxShadow:'var(--shadow-sm)',WebkitTapHighlightColor:'transparent'}}>{dark?<I.Sun/>:<I.Moon/>}</button>
           <div className="auth-in" style={{width:'100%',maxWidth:420,position:'relative'}}>
             <div style={{textAlign:'center',marginBottom:'2rem'}}>
               <div style={{display:'inline-flex',alignItems:'center',justifyContent:'center',width:60,height:60,borderRadius:18,background:'var(--accent)',marginBottom:16,boxShadow:'0 6px 20px rgba(27,82,68,0.28)'}}><I.Lock/></div>
@@ -493,9 +582,7 @@
       </div>
     );
 
-    // ══════════════════════════════════════════════════════════════
-    //  USER MANAGEMENT MODAL
-    // ══════════════════════════════════════════════════════════════
+    // ── User Management Modal ──────────────────────────────────────
     const UserManagementModal = ({ open, currentUserId, onClose }) => {
       const [users,setUsers]=useState([]), [loading,setLoading]=useState(false), [busy,setBusy]=useState({});
       const load=useCallback(async()=>{ setLoading(true); setUsers(await getAllProfiles()); setLoading(false); },[]);
@@ -541,9 +628,7 @@
       );
     };
 
-    // ══════════════════════════════════════════════════════════════
-    //  POLICY DOC CONTENT  (shared, mobile-aware)
-    // ══════════════════════════════════════════════════════════════
+    // ── Policy Doc Content ─────────────────────────────────────────
     const PolicyDocContent = ({ policy, refs, refsLoading, onNavigate, mobile }) => {
       const m = parseContent(policy.content||'');
       const titleSize = mobile ? 26 : 34;
@@ -554,13 +639,7 @@
             {m.date&&<p style={{fontSize:mobile?12:15,color:'var(--text-3)',letterSpacing:'0.08em',textTransform:'uppercase',fontWeight:600}}>{stripOf(m.doc_prefix||'Policy')} of {displayDate(m.date)}</p>}
             {m.issue>0&&<p style={{fontSize:12,color:'var(--text-3)',fontWeight:400,marginTop:4,letterSpacing:'0.04em'}}>Issue {toRoman(m.issue)}</p>}
           </div>
-          {m.roles&&(
-            <div style={{marginBottom:'1rem'}}>
-              {m.roles.split(',').map(r=>r.trim()).filter(Boolean).map((r,i)=>(
-                <p key={i} style={{fontSize:11.5,color:'var(--text-2)',lineHeight:2,letterSpacing:'0.01em'}}>{r}</p>
-              ))}
-            </div>
-          )}
+          {m.roles&&(<div style={{marginBottom:'1rem'}}>{m.roles.split(',').map(r=>r.trim()).filter(Boolean).map((r,i)=>(<p key={i} style={{fontSize:11.5,color:'var(--text-2)',lineHeight:2,letterSpacing:'0.01em'}}>{r}</p>))}</div>)}
           {(()=>{
             const se = m.series?.length>0 ? m.series : (policy.primary_category?[{name:policy.primary_category,number:policy.secondary_category||''}]:[]);
             return se.length>0?(
@@ -599,15 +678,14 @@
       );
     };
 
-    // ══════════════════════════════════════════════════════════════
-    //  POLICY ACTION BOTTOM SHEET
-    // ══════════════════════════════════════════════════════════════
-    const PolicyActionSheet = ({ policy, onClose, onDelete, onEdit, isAdmin }) => {
+    // ── Policy Action Sheet ────────────────────────────────────────
+    const PolicyActionSheet = ({ policy, onClose, onDelete, onEdit, isAdmin, canEdit }) => {
       const [confirming,setConfirming]=useState(false), [deleting,setDeleting]=useState(false);
       const handleShare=async()=>{ try { if(navigator.share){await navigator.share({title:policy.name,text:policy.name}); onClose();} else {await navigator.clipboard.writeText(policy.name); onClose();} } catch{ onClose(); } };
       const handleExport=()=>{ const html=generatePolicyHTML(policy); const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([html],{type:'text/html'})); a.download=`${policy.name.replace(/[^a-z0-9]/gi,'_')}.html`; a.click(); onClose(); };
       const handlePrint=()=>{ const w=window.open('','_blank'); if(!w){onClose();return;} w.document.write(generatePolicyHTML(policy)); w.document.close(); w.focus(); setTimeout(()=>w.print(),400); onClose(); };
       const handleDelete=async()=>{ setDeleting(true); await onDelete(policy.id); setDeleting(false); onClose(); };
+      const showEdit = isAdmin || canEdit;
       return (
         <div onClick={e=>{ if(e.target===e.currentTarget) onClose(); }} style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.5)',zIndex:500,backdropFilter:'blur(8px)',WebkitBackdropFilter:'blur(8px)',display:'flex',alignItems:'flex-end'}}>
           <div className="slide-in-up" style={{width:'100%',maxWidth:600,margin:'0 auto',background:'var(--surface)',borderRadius:'var(--r-xl) var(--r-xl) 0 0',boxShadow:'var(--shadow-lg)',paddingBottom:'var(--safe-bottom)'}}>
@@ -623,11 +701,15 @@
             ):(
               <>
                 <div style={{padding:'10px 20px 0',display:'flex',justifyContent:'center'}}><div style={{width:36,height:4,borderRadius:2,background:'var(--border-2)'}}/></div>
-                <div style={{padding:'12px 16px 6px',borderBottom:'1px solid var(--border)'}}><p style={{fontSize:13,fontWeight:600,color:'var(--text)',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{policy.name}</p></div>
+                <div style={{padding:'12px 16px 6px',borderBottom:'1px solid var(--border)',display:'flex',alignItems:'center',gap:8}}>
+                  <p style={{fontSize:13,fontWeight:600,color:'var(--text)',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',flex:1}}>{policy.name}</p>
+                  <VisibilityBadge visibility={policy.visibility} small/>
+                </div>
                 <button onClick={handleShare} className="action-menu-item"><I.Share/> Share</button>
                 <button onClick={handleExport} className="action-menu-item"><I.Download/> Export as HTML</button>
                 <button onClick={handlePrint} className="action-menu-item"><I.Printer/> Print</button>
-                {isAdmin&&<><div style={{height:1,background:'var(--border)',margin:'4px 0'}}/><button onClick={onEdit} className="action-menu-item"><I.Edit/> Edit Policy</button><button onClick={()=>setConfirming(true)} className="action-menu-item danger"><I.Trash/> Delete Policy</button></>}
+                {showEdit&&<><div style={{height:1,background:'var(--border)',margin:'4px 0'}}/><button onClick={onEdit} className="action-menu-item"><I.Edit/> Edit Policy</button></>}
+                {isAdmin&&<button onClick={()=>setConfirming(true)} className="action-menu-item danger"><I.Trash/> Delete Policy</button>}
                 <div style={{height:1,background:'var(--border)',margin:'4px 0'}}/>
                 <button onClick={onClose} className="action-menu-item" style={{justifyContent:'center',color:'var(--text-3)',fontWeight:600}}>Cancel</button>
               </>
@@ -637,9 +719,7 @@
       );
     };
 
-    // ══════════════════════════════════════════════════════════════
-    //  REFERENCED POLICIES EDITOR  (unchanged)
-    // ══════════════════════════════════════════════════════════════
+    // ── Referenced Policies Editor ─────────────────────────────────
     const ReferencedPoliciesEditor = ({ currentPolicyId, value, onChange, refTypes, onChangeRefTypes }) => {
       const [showSearch,setShowSearch]=useState(false), [search,setSearch]=useState(''), [results,setResults]=useState([]), [searching,setSearching]=useState(false), [dragIdx,setDragIdx]=useState(null), [dragOver,setDragOver]=useState(null);
       const searchRef=useRef(null);
@@ -689,9 +769,7 @@
       );
     };
 
-    // ══════════════════════════════════════════════════════════════
-    //  SETTINGS MODAL  (bottom sheet on mobile)
-    // ══════════════════════════════════════════════════════════════
+    // ── Settings Modal ─────────────────────────────────────────────
     const SettingsModal = ({ open, settings, dark, onToggleDark, profile, isAdmin, onManageUsers, onSignOut, onSave, onClose }) => {
       const [tab,setTab]=useState('appearance'), [prefixes,setPrefixes]=useState([]), [policyFont,setPolicyFont]=useState('serif'), [fontColor,setFontColor]=useState(''), [fontSize,setFontSize]=useState('14.5'), [pwForm,setPwForm]=useState({current:'',next:'',confirm:''}), [pwMsg,setPwMsg]=useState({text:'',ok:false}), [pwLoading,setPwLoading]=useState(false);
       const inp={width:'100%',padding:'9px 12px',border:'1px solid var(--border-2)',borderRadius:'var(--r)',background:'var(--bg)',color:'var(--text)',fontFamily:'var(--font-u)',fontSize:13,outline:'none'};
@@ -704,8 +782,8 @@
       const presetColors=[{label:'Default',value:''},{label:'Slate',value:'#334155'},{label:'Forest',value:'#1B5244'},{label:'Midnight',value:'#1e1e2e'},{label:'Burgundy',value:'#6b2737'}];
       const TABS=[{id:'appearance',label:'Appearance'},{id:'documents',label:'Documents'},{id:'account',label:'Account'}];
       return (
-        <div onClick={e=>{ if(e.target===e.currentTarget) onClose(); }} style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.55)',display:'flex',alignItems:'flex-end',justifyContent:'center',zIndex:300,backdropFilter:'blur(8px)',WebkitBackdropFilter:'blur(8px)'}}>
-          <div className="slide-in-up" style={{background:'var(--surface)',borderRadius:'var(--r-xl) var(--r-xl) 0 0',width:'100%',maxWidth:640,maxHeight:'90vh',display:'flex',flexDirection:'column',boxShadow:'var(--shadow-lg)'}}>
+        <div onClick={e=>{ if(e.target===e.currentTarget) onClose(); }} style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.55)',display:'flex',alignItems:'center',justifyContent:'center',zIndex:300,backdropFilter:'blur(8px)',WebkitBackdropFilter:'blur(8px)'}}>
+          <div className="slide-up" style={{background:'var(--surface)',borderRadius:'var(--r-xl)',width:'min(100vw,520px)',maxHeight:'90vh',display:'flex',flexDirection:'column',boxShadow:'var(--shadow-lg)',margin:16}}>
             <div style={{padding:'16px 20px 0',borderBottom:'1px solid var(--border)',flexShrink:0}}>
               <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:14}}>
                 <h2 style={{fontFamily:'var(--font-d)',fontSize:24,fontWeight:400}}>Settings</h2>
@@ -785,7 +863,7 @@
                 <div style={{borderTop:'1px solid var(--border)',paddingTop:18}}><Btn variant="danger" full onClick={()=>{ onClose(); onSignOut(); }}><I.LogOut/> Sign Out</Btn></div>
               </div>
             )}
-            <div style={{padding:'12px 20px',borderTop:'1px solid var(--border)',display:'flex',justifyContent:'flex-end',gap:8,paddingBottom:'calc(12px + var(--safe-bottom))'}}>
+            <div style={{padding:'12px 20px',borderTop:'1px solid var(--border)',display:'flex',justifyContent:'flex-end',gap:8}}>
               <Btn variant="ghost" onClick={onClose}>Cancel</Btn>
               <Btn variant="primary" onClick={save}>Save Settings</Btn>
             </div>
@@ -794,23 +872,22 @@
       );
     };
 
-    // ══════════════════════════════════════════════════════════════
-    //  POLICY MODAL  (add / edit — unchanged logic)
-    // ══════════════════════════════════════════════════════════════
-    const PolicyModal = ({ open, mode, editPolicy, cats, settings, onSave, onClose }) => {
-      const blank={name:'',body:'',series_entries:[{name:'',number:''}],date:'',issue:0,doc_prefix:'',roles:'',author_name:'',author_role:''};
-      const [form,setForm]=useState(blank), [refs,setRefs]=useState([]), [refTypes,setRefTypes]=useState({}), [showIssue,setShowIssue]=useState(false), [issueInput,setIssueInput]=useState(''), [saving,setSaving]=useState(false), [err,setErr]=useState(''), [sDragIdx,setSDragIdx]=useState(null), [sDragOver,setSDragOver]=useState(null);
+    // ── Policy Modal (add / edit) ──────────────────────────────────
+    const PolicyModal = ({ open, mode, editPolicy, cats, settings, onSave, onClose, userId }) => {
+      const blank={name:'',body:'',series_entries:[{name:'',number:''}],date:'',issue:0,doc_prefix:'',roles:'',author_name:'',author_role:'',visibility:'family'};
+      const [form,setForm]=useState(blank), [refs,setRefs]=useState([]), [refTypes,setRefTypes]=useState({}), [shares,setShares]=useState([]), [showIssue,setShowIssue]=useState(false), [issueInput,setIssueInput]=useState(''), [saving,setSaving]=useState(false), [err,setErr]=useState(''), [sDragIdx,setSDragIdx]=useState(null), [sDragOver,setSDragOver]=useState(null);
       const nameRef=useRef(null);
       useEffect(()=>{
         if (!open) return;
         if (mode==='edit'&&editPolicy) {
           const m=parseContent(editPolicy.content||'');
           const series_entries=(m.series&&m.series.length>0)?m.series:[{name:editPolicy.primary_category||'',number:editPolicy.secondary_category||''}];
-          setForm({name:editPolicy.name||'',series_entries,date:toISODate(m.date)||'',issue:m.issue||0,doc_prefix:m.doc_prefix||'',roles:m.roles||'',author_name:m.author_name||'',author_role:m.author_role||'',body:m.body||''});
+          setForm({name:editPolicy.name||'',series_entries,date:toISODate(m.date)||'',issue:m.issue||0,doc_prefix:m.doc_prefix||'',roles:m.roles||'',author_name:m.author_name||'',author_role:m.author_role||'',body:m.body||'',visibility:editPolicy.visibility||'family'});
           setRefTypes(m.ref_types||{});
           if(m.issue>0){setShowIssue(true);setIssueInput(String(m.issue));}else{setShowIssue(false);setIssueInput('');}
           apiGetReferences(editPolicy.id).then(setRefs);
-        } else { setForm(blank); setRefs([]); setRefTypes({}); setShowIssue(false); setIssueInput(''); }
+          apiGetShares(editPolicy.id).then(setShares);
+        } else { setForm(blank); setRefs([]); setRefTypes({}); setShares([]); setShowIssue(false); setIssueInput(''); }
         setErr(''); setSaving(false);
         setTimeout(()=>nameRef.current?.focus(),80);
       },[open]);
@@ -831,16 +908,23 @@
             finalIssue=nextIssue;
           }
         }
-        const dbForm={name:form.name.trim(),content:serializeContent({date:form.date,issue:finalIssue,doc_prefix:form.doc_prefix,roles:form.roles,author_name:form.author_name,author_role:form.author_role,series:form.series_entries,ref_types:refTypes,body:form.body}),primary_category:form.series_entries[0]?.name?.trim()||'',secondary_category:form.series_entries[0]?.number?.trim()||null,tertiary_category:null};
-        const {data,error}=await apiSave(dbForm,mode==='edit'?editPolicy.id:null);
+        const dbForm={name:form.name.trim(),content:serializeContent({date:form.date,issue:finalIssue,doc_prefix:form.doc_prefix,roles:form.roles,author_name:form.author_name,author_role:form.author_role,series:form.series_entries,ref_types:refTypes,body:form.body}),primary_category:form.series_entries[0]?.name?.trim()||'',secondary_category:form.series_entries[0]?.number?.trim()||null,tertiary_category:null,visibility:form.visibility};
+        const {data,error}=await apiSave(dbForm,mode==='edit'?editPolicy.id:null,userId);
         if (error){setErr(error.message);setSaving(false);return;}
         await apiSaveReferences(data.id,refs.map(r=>r.id));
+        if (form.visibility==='shared') await apiSaveShares(data.id, shares);
+        else await apiSaveShares(data.id, []);
         setSaving(false); onSave(data);
       };
       if (!open) return null;
       const inp={width:'100%',padding:'10px 12px',border:'1px solid var(--border-2)',borderRadius:'var(--r)',background:'var(--bg)',color:'var(--text)',fontFamily:'var(--font-u)',fontSize:14,outline:'none'};
       const lbl={fontSize:10,fontWeight:700,color:'var(--text-3)',marginBottom:6,display:'block',textTransform:'uppercase',letterSpacing:'0.09em'};
       const divider=(label)=>(<div style={{display:'flex',alignItems:'center',gap:10,marginTop:4}}><span style={{fontSize:9.5,letterSpacing:'0.12em',textTransform:'uppercase',fontWeight:700,color:'var(--text-3)',whiteSpace:'nowrap'}}>{label}</span><div style={{flex:1,height:1,background:'var(--border-2)'}}/></div>);
+      const visOptions=[
+        {val:'family',icon:<I.Globe/>,label:'Family',desc:'All approved members of this vault can read'},
+        {val:'shared',icon:<I.UserPlus/>,label:'Specific people',desc:'Only the people you choose below'},
+        {val:'private',icon:<I.LockSm/>,label:'Private',desc:'Only you (and administrators)'},
+      ];
       return (
         <div onClick={e=>{ if(e.target===e.currentTarget) onClose(); }} onKeyDown={e=>{ if(e.key==='Escape') onClose(); if((e.metaKey||e.ctrlKey)&&e.key==='Enter') save(); }} style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.55)',display:'flex',alignItems:'flex-end',justifyContent:'center',zIndex:400,backdropFilter:'blur(8px)',WebkitBackdropFilter:'blur(8px)'}}>
           <div className="slide-in-up" style={{background:'var(--surface)',borderRadius:'var(--r-xl) var(--r-xl) 0 0',width:'100%',maxWidth:700,maxHeight:'96vh',display:'flex',flexDirection:'column',boxShadow:'var(--shadow-lg)'}}>
@@ -899,6 +983,25 @@
                 <div><label style={lbl}>Author Name</label><input className="form-input" style={{...inp,textTransform:'uppercase'}} value={form.author_name} onChange={f('author_name')} placeholder="JOHN SMITH"/></div>
                 <div><label style={lbl}>Author Role</label><input className="form-input" style={{...inp,textTransform:'uppercase'}} value={form.author_role} onChange={f('author_role')} placeholder="CHIEF EXECUTIVE"/></div>
               </div>
+              {divider('Visibility & Access')}
+              <div style={{display:'flex',flexDirection:'column',gap:8}}>
+                {visOptions.map(opt=>(
+                  <label key={opt.val} style={{display:'flex',alignItems:'center',gap:12,padding:'11px 14px',border:`1.5px solid ${form.visibility===opt.val?'var(--accent)':'var(--border-2)'}`,borderRadius:'var(--r)',background:form.visibility===opt.val?'var(--accent-muted)':'var(--bg)',cursor:'pointer',transition:'all 0.14s'}}>
+                    <input type="radio" name="visibility" value={opt.val} checked={form.visibility===opt.val} onChange={()=>setForm(p=>({...p,visibility:opt.val}))} style={{accentColor:'var(--accent)'}}/>
+                    <span style={{color:'var(--text-3)',display:'flex',flexShrink:0}}>{opt.icon}</span>
+                    <div style={{minWidth:0}}>
+                      <div style={{fontSize:13,fontWeight:600,color:form.visibility===opt.val?'var(--accent-text)':'var(--text)'}}>{opt.label}</div>
+                      <div style={{fontSize:11.5,color:'var(--text-3)',lineHeight:1.4}}>{opt.desc}</div>
+                    </div>
+                  </label>
+                ))}
+              </div>
+              {form.visibility==='shared'&&(
+                <div>
+                  <label style={lbl}>Who can see this policy</label>
+                  <SharePicker currentUserId={userId} shares={shares} onChangeShares={setShares}/>
+                </div>
+              )}
               {err&&<div style={{fontSize:13,color:'var(--danger)',background:'var(--danger-bg)',padding:'10px 13px',borderRadius:'var(--r)',borderLeft:'3px solid var(--danger)'}}>{err}</div>}
             </div>
             <div style={{padding:'12px 20px',borderTop:'1px solid var(--border)',display:'flex',justifyContent:'flex-end',gap:8,paddingBottom:'calc(12px + var(--safe-bottom))'}}>
@@ -910,9 +1013,7 @@
       );
     };
 
-    // ══════════════════════════════════════════════════════════════
-    //  SETUP SCREEN
-    // ══════════════════════════════════════════════════════════════
+    // ── Setup Screen ───────────────────────────────────────────────
     const SetupScreen = () => {
       const urlOk=SUPABASE_URL.startsWith('https://'), keyOk=SUPABASE_ANON_KEY.length>20&&!SUPABASE_ANON_KEY.includes('__');
       return (
@@ -930,9 +1031,7 @@
       );
     };
 
-    // ══════════════════════════════════════════════════════════════
-    //  PWA — BOTTOM NAVIGATION
-    // ══════════════════════════════════════════════════════════════
+    // ── Bottom Nav (mobile) ────────────────────────────────────────
     const BottomNav = ({ tab, onTab }) => {
       const items = [
         { id:'home',     label:'Policies', icon: <I.Home/> },
@@ -952,14 +1051,11 @@
       );
     };
 
-    // ══════════════════════════════════════════════════════════════
-    //  PWA — HOME SCREEN  (series list)
-    // ══════════════════════════════════════════════════════════════
+    // ── Mobile: Home Screen ────────────────────────────────────────
     const HomeScreen = ({ cats, loading, dark, onToggleDark, onSeriesSelect, isAdmin, onNewPolicy, profile }) => {
       const colors = ['#1B5244','#2D5A7B','#5C3D7A','#7A3D3D','#3D5C3D','#7A5C1B','#3D4C7A'];
       return (
         <div style={{flex:1,overflowY:'auto',paddingBottom:'calc(70px + var(--safe-bottom))'}}>
-          {/* Header */}
           <div className="glass pwa-header" style={{position:'sticky',top:0,zIndex:10,padding:'calc(var(--safe-top) + 12px) 20px 12px',borderBottom:'1px solid var(--border)'}}>
             <div style={{display:'flex',alignItems:'center',justifyContent:'space-between'}}>
               <div>
@@ -978,16 +1074,12 @@
               </div>
             </div>
           </div>
-
           <div style={{padding:'16px 16px 0'}}>
-            {/* Section label */}
             <div style={{fontSize:10,fontWeight:700,color:'var(--text-3)',letterSpacing:'0.1em',textTransform:'uppercase',marginBottom:10,padding:'0 4px'}}>Browse by Series</div>
-
             {loading?(
               <div style={{display:'flex',alignItems:'center',justifyContent:'center',padding:'3rem',color:'var(--text-3)'}}><I.Spin/></div>
             ):(
               <div style={{display:'flex',flexDirection:'column',gap:10}}>
-                {/* All Policies card */}
                 <button onClick={()=>onSeriesSelect(null)} className="series-card"
                   style={{width:'100%',padding:'18px 20px',background:'var(--accent)',border:'none',borderRadius:'var(--r-lg)',cursor:'pointer',display:'flex',alignItems:'center',gap:14,textAlign:'left',color:'#fff',boxShadow:'0 4px 16px rgba(27,82,68,0.25)',WebkitTapHighlightColor:'transparent'}}>
                   <div style={{width:40,height:40,borderRadius:10,background:'rgba(255,255,255,0.18)',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}>
@@ -999,8 +1091,6 @@
                   </div>
                   <div style={{marginLeft:'auto',opacity:0.7}}><I.CRight/></div>
                 </button>
-
-                {/* Series cards */}
                 {cats.primaries.map((series, idx)=>(
                   <button key={series} onClick={()=>onSeriesSelect(series)} className="series-card"
                     style={{width:'100%',padding:'16px 20px',background:'var(--surface)',border:'1px solid var(--border)',borderRadius:'var(--r-lg)',cursor:'pointer',display:'flex',alignItems:'center',gap:14,textAlign:'left',WebkitTapHighlightColor:'transparent',boxShadow:'var(--shadow-sm)'}}>
@@ -1021,32 +1111,23 @@
       );
     };
 
-    // ══════════════════════════════════════════════════════════════
-    //  PWA — POLICY LIST SCREEN
-    // ══════════════════════════════════════════════════════════════
-    const PolicyListScreen = ({ series, policies, loading, onBack, onSelect, onDelete, isAdmin }) => {
+    // ── Mobile: Policy List Screen ─────────────────────────────────
+    const PolicyListScreen = ({ series, policies, loading, onBack, onSelect, onDelete, isAdmin, userId }) => {
       const [actionMenu, setActionMenu] = useState(null);
       return (
         <div style={{flex:1,display:'flex',flexDirection:'column',overflow:'hidden'}}>
-          {/* Header */}
           <div className="glass pwa-header" style={{position:'sticky',top:0,zIndex:10,padding:'calc(var(--safe-top) + 10px) 16px 10px',borderBottom:'1px solid var(--border)',display:'flex',alignItems:'center',gap:12,flexShrink:0}}>
-            <button onClick={onBack} style={{width:36,height:36,borderRadius:'var(--r)',background:'transparent',border:'none',cursor:'pointer',color:'var(--text-2)',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0,WebkitTapHighlightColor:'transparent',marginLeft:-4}}>
-              <I.Back/>
-            </button>
+            <button onClick={onBack} style={{width:36,height:36,borderRadius:'var(--r)',background:'transparent',border:'none',cursor:'pointer',color:'var(--text-2)',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0,WebkitTapHighlightColor:'transparent',marginLeft:-4}}><I.Back/></button>
             <div style={{flex:1,minWidth:0}}>
               <h2 style={{fontSize:17,fontWeight:700,color:'var(--text)',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{series||'All Policies'}</h2>
               <p style={{fontSize:11,color:'var(--text-3)',marginTop:1}}>{loading?'Loading…':`${policies.length} ${policies.length===1?'policy':'policies'}`}</p>
             </div>
           </div>
-          {/* List */}
           <div style={{flex:1,overflowY:'auto',paddingBottom:'calc(70px + var(--safe-bottom))'}}>
             {loading?(
               <div style={{display:'flex',alignItems:'center',justifyContent:'center',padding:'3rem',color:'var(--text-3)'}}><I.Spin/></div>
             ):policies.length===0?(
-              <div style={{display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',padding:'4rem 2rem',gap:12,color:'var(--text-3)'}}>
-                <I.File2/>
-                <span style={{fontSize:14}}>No policies in this series</span>
-              </div>
+              <div style={{display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',padding:'4rem 2rem',gap:12,color:'var(--text-3)'}}><I.File2/><span style={{fontSize:14}}>No policies in this series</span></div>
             ):(
               policies.map((p,idx)=>{
                 const meta=parseContent(p.content||'');
@@ -1056,53 +1137,43 @@
                   <div key={p.id} style={{display:'flex',alignItems:'stretch',borderBottom:'1px solid var(--border)'}}>
                     <button onClick={()=>onSelect(p)} className="tap-row"
                       style={{flex:1,padding:'14px 16px',background:'transparent',border:'none',cursor:'pointer',textAlign:'left',display:'block',minWidth:0,WebkitTapHighlightColor:'transparent'}}>
-                      <div style={{display:'flex',alignItems:'baseline',gap:8,marginBottom:4,minWidth:0}}>
+                      <div style={{display:'flex',alignItems:'center',gap:6,marginBottom:4,minWidth:0}}>
                         <span style={{fontSize:14,fontWeight:600,color:'var(--text)',flex:1,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{p.name}</span>
+                        <VisibilityBadge visibility={p.visibility} small/>
                         <span style={{fontSize:10,fontWeight:700,color:'var(--text-3)',textTransform:'uppercase',letterSpacing:'0.07em',flexShrink:0}}>{docType}</span>
                       </div>
                       <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:8}}>
-                        <span style={{fontSize:12,color:'var(--text-3)',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>
-                          {p.primary_category}{p.secondary_category?` · Series ${p.secondary_category}`:''}
-                        </span>
+                        <span style={{fontSize:12,color:'var(--text-3)',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{p.primary_category}{p.secondary_category?` · Series ${p.secondary_category}`:''}</span>
                         {policyDate&&<span style={{fontSize:11,color:'var(--text-3)',flexShrink:0}}>{policyDate}</span>}
                       </div>
                     </button>
-                    <button onClick={e=>{ e.stopPropagation(); setActionMenu(p); }} style={{padding:'0 14px',background:'transparent',border:'none',borderLeft:'1px solid var(--border)',cursor:'pointer',color:'var(--text-3)',display:'flex',alignItems:'center',WebkitTapHighlightColor:'transparent',flexShrink:0}}>
-                      <I.Dots/>
-                    </button>
+                    <button onClick={e=>{ e.stopPropagation(); setActionMenu(p); }} style={{padding:'0 14px',background:'transparent',border:'none',borderLeft:'1px solid var(--border)',cursor:'pointer',color:'var(--text-3)',display:'flex',alignItems:'center',WebkitTapHighlightColor:'transparent',flexShrink:0}}><I.Dots/></button>
                   </div>
                 );
               })
             )}
           </div>
           {actionMenu&&(
-            <PolicyActionSheet policy={actionMenu} onClose={()=>setActionMenu(null)} onDelete={async(id)=>{ await onDelete(id); setActionMenu(null); }} isAdmin={isAdmin} onEdit={()=>{ /* handled by parent */ setActionMenu(null); }}/>
+            <PolicyActionSheet policy={actionMenu} onClose={()=>setActionMenu(null)} onDelete={async(id)=>{ await onDelete(id); setActionMenu(null); }} isAdmin={isAdmin} canEdit={actionMenu.owner_id===userId} onEdit={()=>setActionMenu(null)}/>
           )}
         </div>
       );
     };
 
-    // ══════════════════════════════════════════════════════════════
-    //  PWA — POLICY VIEW SCREEN
-    // ══════════════════════════════════════════════════════════════
-    const PolicyViewScreen = ({ policy, loading, onBack, onEdit, onDelete, onNavigate, isAdmin }) => {
+    // ── Mobile: Policy View Screen ─────────────────────────────────
+    const PolicyViewScreen = ({ policy, loading, onBack, onEdit, onDelete, onNavigate, isAdmin, userId }) => {
       const [refs,setRefs]=useState([]), [refsLoading,setRefsLoading]=useState(false), [actionSheet,setActionSheet]=useState(false);
       useEffect(()=>{ if(!policy?.id){setRefs([]);return;} setRefsLoading(true); apiGetReferences(policy.id).then(d=>{setRefs(d);setRefsLoading(false);}); },[policy?.id]);
       return (
         <div style={{flex:1,display:'flex',flexDirection:'column',overflow:'hidden'}}>
-          {/* Header */}
           <div className="glass pwa-header" style={{position:'sticky',top:0,zIndex:10,padding:'calc(var(--safe-top) + 10px) 16px 10px',borderBottom:'1px solid var(--border)',display:'flex',alignItems:'center',gap:12,flexShrink:0}}>
-            <button onClick={onBack} style={{width:36,height:36,borderRadius:'var(--r)',background:'transparent',border:'none',cursor:'pointer',color:'var(--text-2)',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0,WebkitTapHighlightColor:'transparent',marginLeft:-4}}>
-              <I.Back/>
-            </button>
-            <div style={{flex:1,minWidth:0}}>
-              <p style={{fontSize:14,fontWeight:600,color:'var(--text)',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{policy?.name||''}</p>
+            <button onClick={onBack} style={{width:36,height:36,borderRadius:'var(--r)',background:'transparent',border:'none',cursor:'pointer',color:'var(--text-2)',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0,WebkitTapHighlightColor:'transparent',marginLeft:-4}}><I.Back/></button>
+            <div style={{flex:1,minWidth:0,display:'flex',alignItems:'center',gap:8}}>
+              <p style={{fontSize:14,fontWeight:600,color:'var(--text)',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',flex:1}}>{policy?.name||''}</p>
+              <VisibilityBadge visibility={policy?.visibility} small/>
             </div>
-            <button onClick={()=>setActionSheet(true)} style={{width:36,height:36,borderRadius:'var(--r)',background:'transparent',border:'none',cursor:'pointer',color:'var(--text-2)',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0,WebkitTapHighlightColor:'transparent'}}>
-              <I.Dots/>
-            </button>
+            <button onClick={()=>setActionSheet(true)} style={{width:36,height:36,borderRadius:'var(--r)',background:'transparent',border:'none',cursor:'pointer',color:'var(--text-2)',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0,WebkitTapHighlightColor:'transparent'}}><I.Dots/></button>
           </div>
-          {/* Content */}
           <div style={{flex:1,overflowY:'auto',paddingBottom:'calc(70px + var(--safe-bottom))'}}>
             {loading?(
               <div style={{display:'flex',alignItems:'center',justifyContent:'center',padding:'4rem',color:'var(--text-3)'}}><I.Spin/></div>
@@ -1113,21 +1184,13 @@
             ):null}
           </div>
           {actionSheet&&policy&&(
-            <PolicyActionSheet
-              policy={policy}
-              onClose={()=>setActionSheet(false)}
-              onDelete={async(id)=>{ await onDelete(id); setActionSheet(false); onBack(); }}
-              onEdit={()=>{ setActionSheet(false); onEdit(); }}
-              isAdmin={isAdmin}
-            />
+            <PolicyActionSheet policy={policy} onClose={()=>setActionSheet(false)} onDelete={async(id)=>{ await onDelete(id); setActionSheet(false); onBack(); }} onEdit={()=>{ setActionSheet(false); onEdit(); }} isAdmin={isAdmin} canEdit={policy.owner_id===userId}/>
           )}
         </div>
       );
     };
 
-    // ══════════════════════════════════════════════════════════════
-    //  PWA — SEARCH SCREEN
-    // ══════════════════════════════════════════════════════════════
+    // ── Mobile: Search Screen ──────────────────────────────────────
     const SearchScreen = ({ onOpenPolicy }) => {
       const [query,setQuery]=useState(''), [results,setResults]=useState([]), [loading,setLoading]=useState(false), [searched,setSearched]=useState(false);
       const inputRef=useRef(null);
@@ -1141,18 +1204,13 @@
       useEffect(()=>{ runSearch(query); },[query]);
       return (
         <div style={{flex:1,display:'flex',flexDirection:'column',overflow:'hidden'}}>
-          {/* Search header */}
           <div className="glass" style={{position:'sticky',top:0,zIndex:10,padding:'calc(var(--safe-top) + 12px) 16px 12px',borderBottom:'1px solid var(--border)',flexShrink:0}}>
             <div style={{position:'relative',display:'flex',alignItems:'center'}}>
               <span style={{position:'absolute',left:12,color:'var(--text-3)',display:'flex',pointerEvents:'none'}}><I.SearchSm/></span>
-              <input ref={inputRef} type="search" value={query} onChange={e=>setQuery(e.target.value)}
-                placeholder="Search policies…"
-                style={{width:'100%',padding:'11px 40px 11px 36px',border:'1px solid var(--border-2)',borderRadius:'var(--r-lg)',background:'var(--surface-2)',color:'var(--text)',fontFamily:'var(--font-u)',fontSize:15,outline:'none'}}
-              />
+              <input ref={inputRef} type="search" value={query} onChange={e=>setQuery(e.target.value)} placeholder="Search policies…" style={{width:'100%',padding:'11px 40px 11px 36px',border:'1px solid var(--border-2)',borderRadius:'var(--r-lg)',background:'var(--surface-2)',color:'var(--text)',fontFamily:'var(--font-u)',fontSize:15,outline:'none'}}/>
               {query&&<button onClick={()=>setQuery('')} style={{position:'absolute',right:10,background:'transparent',border:'none',cursor:'pointer',color:'var(--text-3)',display:'flex',padding:4,WebkitTapHighlightColor:'transparent'}}><I.X/></button>}
             </div>
           </div>
-          {/* Results */}
           <div style={{flex:1,overflowY:'auto',paddingBottom:'calc(70px + var(--safe-bottom))'}}>
             {loading?(
               <div style={{display:'flex',alignItems:'center',justifyContent:'center',padding:'3rem',color:'var(--text-3)'}}><I.Spin/></div>
@@ -1162,23 +1220,19 @@
                 <p style={{fontSize:14,textAlign:'center',lineHeight:1.6}}>Search by policy name,<br/>content, or series</p>
               </div>
             ):results.length===0?(
-              <div style={{display:'flex',flexDirection:'column',alignItems:'center',padding:'4rem 2rem',gap:8,color:'var(--text-3)'}}>
-                <p style={{fontSize:14}}>No results for "<strong>{query}</strong>"</p>
-              </div>
+              <div style={{display:'flex',flexDirection:'column',alignItems:'center',padding:'4rem 2rem',gap:8,color:'var(--text-3)'}}><p style={{fontSize:14}}>No results for "<strong>{query}</strong>"</p></div>
             ):(
               <>
-                <div style={{padding:'10px 16px 6px',fontSize:11,fontWeight:700,color:'var(--text-3)',letterSpacing:'0.06em',textTransform:'uppercase'}}>
-                  {results.length} {results.length===1?'result':'results'}
-                </div>
+                <div style={{padding:'10px 16px 6px',fontSize:11,fontWeight:700,color:'var(--text-3)',letterSpacing:'0.06em',textTransform:'uppercase'}}>{results.length} {results.length===1?'result':'results'}</div>
                 {results.map(p=>{
                   const meta=parseContent(p.content||'');
                   const docType=stripOf(meta.doc_prefix||'Policy');
                   const policyDate=meta.date?fmtDate(meta.date):'';
                   return (
-                    <button key={p.id} onClick={()=>onOpenPolicy(p)} className="tap-row"
-                      style={{width:'100%',padding:'14px 16px',background:'transparent',border:'none',borderBottom:'1px solid var(--border)',cursor:'pointer',textAlign:'left',display:'block',WebkitTapHighlightColor:'transparent'}}>
-                      <div style={{display:'flex',alignItems:'baseline',gap:8,marginBottom:4}}>
+                    <button key={p.id} onClick={()=>onOpenPolicy(p)} className="tap-row" style={{width:'100%',padding:'14px 16px',background:'transparent',border:'none',borderBottom:'1px solid var(--border)',cursor:'pointer',textAlign:'left',display:'block',WebkitTapHighlightColor:'transparent'}}>
+                      <div style={{display:'flex',alignItems:'center',gap:6,marginBottom:4}}>
                         <span style={{fontSize:14,fontWeight:600,color:'var(--text)',flex:1,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{p.name}</span>
+                        <VisibilityBadge visibility={p.visibility} small/>
                         <span style={{fontSize:10,fontWeight:700,color:'var(--text-3)',textTransform:'uppercase',letterSpacing:'0.07em',flexShrink:0}}>{docType}</span>
                       </div>
                       <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:8}}>
@@ -1196,6 +1250,220 @@
     };
 
     // ══════════════════════════════════════════════════════════════
+    //  DESKTOP COMPONENTS
+    // ══════════════════════════════════════════════════════════════
+
+    const useIsDesktop = () => {
+      const [isDesktop, setIsDesktop] = useState(() => window.innerWidth >= 960);
+      useEffect(() => {
+        const mq = window.matchMedia('(min-width: 960px)');
+        const handler = e => setIsDesktop(e.matches);
+        mq.addEventListener('change', handler);
+        return () => mq.removeEventListener('change', handler);
+      }, []);
+      return isDesktop;
+    };
+
+    const DesktopApp = ({ user, profile, dark, onToggleDark, cats, catsLoading, isAdmin, userId, settings, onSignOut, onOpenSettings, onOpenUsers, onNewPolicy, onEditPolicy, onDeletePolicy, onSavePolicy }) => {
+      const colors = ['#1B5244','#2D5A7B','#5C3D7A','#7A3D3D','#3D5C3D','#7A5C1B','#3D4C7A'];
+      const [selectedCategory, setSelectedCategory] = useState(null);
+      const [policies, setPolicies] = useState([]);
+      const [listLoading, setListLoading] = useState(false);
+      const [selectedPolicy, setSelectedPolicy] = useState(null);
+      const [policyLoading, setPolicyLoading] = useState(false);
+      const [refs, setRefs] = useState([]);
+      const [refsLoading, setRefsLoading] = useState(false);
+      const [searchQuery, setSearchQuery] = useState('');
+      const [searchResults, setSearchResults] = useState([]);
+      const [searching, setSearching] = useState(false);
+      const [actionMenu, setActionMenu] = useState(false);
+      const searchRef = useRef(null);
+
+      const loadPolicies = useCallback(async (cat) => {
+        setListLoading(true); setPolicies([]);
+        const res = await apiSearch({ primary: cat||'' });
+        setPolicies(res); setListLoading(false);
+      }, []);
+
+      useEffect(() => { loadPolicies(selectedCategory); }, [selectedCategory]);
+
+      const doSearch = useMemo(() => debounce(async (q) => {
+        if (!q.trim()) { setSearchResults([]); setSearching(false); return; }
+        setSearching(true);
+        const res = await apiSearch({ query: q });
+        setSearchResults(res); setSearching(false);
+      }, 280), []);
+
+      useEffect(() => { doSearch(searchQuery); }, [searchQuery]);
+
+      const openPolicy = async (p) => {
+        setSelectedPolicy(null); setPolicyLoading(true);
+        const full = await apiGetPolicy(p.id);
+        setSelectedPolicy(full || p); setPolicyLoading(false);
+        setRefsLoading(true);
+        apiGetReferences((full||p).id).then(r => { setRefs(r); setRefsLoading(false); });
+      };
+
+      const handleDelete = async (id) => {
+        const { error } = await apiDelete(id);
+        if (error) { alert(`Failed to delete: ${error.message}`); return; }
+        setSelectedPolicy(null); setRefs([]);
+        loadPolicies(selectedCategory);
+        onDeletePolicy();
+      };
+
+      const handleSave = async (saved) => {
+        await loadPolicies(selectedCategory);
+        onSavePolicy();
+        if (saved) {
+          const full = await apiGetPolicy(saved.id);
+          setSelectedPolicy(full || saved);
+          setRefsLoading(true);
+          apiGetReferences((full||saved).id).then(r => { setRefs(r); setRefsLoading(false); });
+        }
+      };
+
+      const displayList = searchQuery.trim() ? searchResults : policies;
+      const isSearching = searchQuery.trim() ? searching : listLoading;
+
+      return (
+        <div className="desktop-root">
+          {/* Top Bar */}
+          <div className="desktop-topbar">
+            <h1 style={{fontFamily:'var(--font-d)',fontSize:24,fontWeight:500,letterSpacing:'-0.03em',lineHeight:1,marginRight:4,whiteSpace:'nowrap'}}>
+              Policy<span style={{color:'var(--accent)'}}>Vault</span>
+            </h1>
+            <div style={{position:'relative',display:'flex',alignItems:'center',flex:'1 1 0',maxWidth:380}}>
+              <span style={{position:'absolute',left:11,color:'var(--text-3)',display:'flex',pointerEvents:'none'}}><I.SearchSm/></span>
+              <input ref={searchRef} type="search" value={searchQuery} onChange={e=>setSearchQuery(e.target.value)} placeholder="Search policies…" className="desktop-search-input" style={{width:'100%'}}/>
+              {searching&&<span style={{position:'absolute',right:10,display:'flex'}}><I.Spin/></span>}
+              {searchQuery&&!searching&&<button onClick={()=>setSearchQuery('')} style={{position:'absolute',right:9,background:'transparent',border:'none',cursor:'pointer',color:'var(--text-3)',display:'flex',padding:2}}><I.X/></button>}
+            </div>
+            <div style={{flex:1}}/>
+            {isAdmin&&(
+              <button onClick={onNewPolicy} style={{display:'flex',alignItems:'center',gap:6,padding:'6px 13px',background:'var(--accent)',border:'none',borderRadius:'var(--r)',cursor:'pointer',color:'#fff',fontSize:13,fontWeight:700,fontFamily:'var(--font-u)',boxShadow:'0 2px 8px rgba(27,82,68,0.22)'}}>
+                <I.Plus/> New Policy
+              </button>
+            )}
+            <button onClick={onToggleDark} className="desktop-icon-btn" title="Toggle theme">
+              {dark ? <I.Sun/> : <I.Moon/>}
+            </button>
+            <button onClick={onOpenSettings} className="desktop-icon-btn" title="Settings">
+              <I.Settings/>
+            </button>
+            <div style={{width:32,height:32,borderRadius:'50%',background:'var(--accent-muted)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:11,fontWeight:700,color:'var(--accent)',cursor:'pointer',border:'1px solid var(--border-2)',flexShrink:0}} onClick={onOpenSettings} title={profile?.email}>
+              {(profile?.email||'?')[0].toUpperCase()}
+            </div>
+          </div>
+
+          {/* 3-pane body */}
+          <div className="desktop-body">
+            {/* Sidebar */}
+            <div className="desktop-sidebar">
+              <div style={{padding:'12px 10px 8px'}}>
+                <div style={{fontSize:9.5,fontWeight:700,color:'var(--text-3)',letterSpacing:'0.1em',textTransform:'uppercase',padding:'0 8px',marginBottom:6}}>Series</div>
+                <button onClick={()=>{ setSelectedCategory(null); setSearchQuery(''); }} className={`desktop-sidebar-item${selectedCategory===null&&!searchQuery?' active':''}`} style={{width:'100%',borderRadius:'var(--r)'}}>
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+                  All Policies
+                </button>
+                {catsLoading ? (
+                  <div style={{display:'flex',justifyContent:'center',padding:'12px'}}><I.Spin/></div>
+                ) : (
+                  cats.primaries.map((cat, idx) => (
+                    <button key={cat} onClick={()=>{ setSelectedCategory(cat); setSearchQuery(''); }} className={`desktop-sidebar-item${selectedCategory===cat&&!searchQuery?' active':''}`} style={{width:'100%',borderRadius:'var(--r)'}}>
+                      <span style={{color:colors[idx%colors.length],display:'flex'}}><I.Folder/></span>
+                      <span style={{overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{cat}</span>
+                    </button>
+                  ))
+                )}
+              </div>
+            </div>
+
+            {/* Policy List */}
+            <div className="desktop-list">
+              <div style={{padding:'12px 16px 10px',borderBottom:'1px solid var(--border)',display:'flex',alignItems:'center',justifyContent:'space-between',flexShrink:0,background:'var(--surface)'}}>
+                <div>
+                  <div style={{fontSize:13,fontWeight:700,color:'var(--text)'}}>{searchQuery ? 'Search Results' : (selectedCategory || 'All Policies')}</div>
+                  <div style={{fontSize:11,color:'var(--text-3)',marginTop:1}}>{isSearching ? 'Loading…' : `${displayList.length} ${displayList.length===1?'policy':'policies'}`}</div>
+                </div>
+              </div>
+              <div style={{overflowY:'auto',height:'calc(100% - 57px)'}}>
+                {isSearching ? (
+                  <div style={{display:'flex',justifyContent:'center',padding:'2rem',color:'var(--text-3)'}}><I.Spin/></div>
+                ) : displayList.length === 0 ? (
+                  <div style={{display:'flex',flexDirection:'column',alignItems:'center',padding:'3rem 1rem',gap:8,color:'var(--text-3)'}}>
+                    <I.File2/>
+                    <span style={{fontSize:13,textAlign:'center'}}>{searchQuery ? `No results for "${searchQuery}"` : 'No policies in this series'}</span>
+                  </div>
+                ) : (
+                  displayList.map(p => {
+                    const meta = parseContent(p.content||'');
+                    const docType = stripOf(meta.doc_prefix||'Policy');
+                    const policyDate = meta.date ? fmtDate(meta.date) : '';
+                    const isActive = selectedPolicy?.id === p.id;
+                    return (
+                      <button key={p.id} onClick={()=>openPolicy(p)} className={`desktop-list-item${isActive?' active':''}`}>
+                        <div style={{display:'flex',alignItems:'center',gap:6,marginBottom:3,minWidth:0}}>
+                          <span style={{fontSize:13.5,fontWeight:600,color:isActive?'var(--accent-text)':'var(--text)',flex:1,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{p.name}</span>
+                          <VisibilityBadge visibility={p.visibility} small/>
+                        </div>
+                        <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:6}}>
+                          <span style={{fontSize:11.5,color:'var(--text-3)',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{p.primary_category}{p.secondary_category?` · ${p.secondary_category}`:''}</span>
+                          <span style={{fontSize:10.5,color:'var(--text-3)',flexShrink:0}}>{policyDate||docType}</span>
+                        </div>
+                      </button>
+                    );
+                  })
+                )}
+              </div>
+            </div>
+
+            {/* Policy Detail */}
+            <div className="desktop-detail">
+              {policyLoading ? (
+                <div style={{display:'flex',alignItems:'center',justifyContent:'center',height:'100%',color:'var(--text-3)'}}><I.Spin/></div>
+              ) : selectedPolicy ? (
+                <div style={{maxWidth:740,margin:'0 auto',padding:'36px 40px 60px'}} className="fade-in">
+                  {/* Detail toolbar */}
+                  <div style={{display:'flex',alignItems:'center',justifyContent:'flex-end',gap:8,marginBottom:28}}>
+                    <VisibilityBadge visibility={selectedPolicy.visibility}/>
+                    <div style={{flex:1}}/>
+                    <Btn variant="ghost" size="sm" onClick={()=>{ const h=generatePolicyHTML(selectedPolicy,refs); const w=window.open('','_blank'); w.document.write(h); w.document.close(); w.focus(); setTimeout(()=>w.print(),400); }}><I.Printer/> Print</Btn>
+                    <Btn variant="ghost" size="sm" onClick={()=>{ const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([generatePolicyHTML(selectedPolicy,refs)],{type:'text/html'})); a.download=`${selectedPolicy.name.replace(/[^a-z0-9]/gi,'_')}.html`; a.click(); }}><I.Download/> Export</Btn>
+                    {(isAdmin||selectedPolicy.owner_id===userId) && (
+                      <Btn variant="default" size="sm" onClick={()=>onEditPolicy(selectedPolicy)}><I.Edit/> Edit</Btn>
+                    )}
+                    {isAdmin && (
+                      <Btn variant="danger" size="sm" onClick={()=>setActionMenu(true)}><I.Trash/></Btn>
+                    )}
+                  </div>
+                  <PolicyDocContent policy={selectedPolicy} refs={refs} refsLoading={refsLoading} onNavigate={openPolicy} mobile={false}/>
+                </div>
+              ) : (
+                <div style={{display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',height:'100%',gap:14,color:'var(--text-3)'}}>
+                  <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1" strokeLinecap="round" style={{opacity:0.3}}><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><line x1="10" y1="9" x2="8" y2="9"/></svg>
+                  <p style={{fontSize:14,opacity:0.6}}>Select a policy to read it</p>
+                </div>
+              )}
+              {actionMenu && selectedPolicy && (
+                <div onClick={e=>{ if(e.target===e.currentTarget) setActionMenu(false); }} style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.5)',zIndex:500,display:'flex',alignItems:'center',justifyContent:'center'}}>
+                  <div className="slide-up" style={{background:'var(--surface)',borderRadius:'var(--r-xl)',padding:24,maxWidth:360,width:'100%',boxShadow:'var(--shadow-lg)',margin:16}}>
+                    <p style={{fontSize:16,fontWeight:700,color:'var(--danger)',marginBottom:8}}>Delete "{selectedPolicy.name}"?</p>
+                    <p style={{fontSize:13,color:'var(--text-3)',lineHeight:1.6,marginBottom:20}}>This action cannot be undone.</p>
+                    <div style={{display:'flex',gap:10}}>
+                      <Btn variant="ghost" full onClick={()=>setActionMenu(false)}>Cancel</Btn>
+                      <Btn variant="primary" full style={{background:'var(--danger)'}} onClick={async()=>{ await handleDelete(selectedPolicy.id); setActionMenu(false); }}>Delete</Btn>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      );
+    };
+
+    // ══════════════════════════════════════════════════════════════
     //  ROOT APP
     // ══════════════════════════════════════════════════════════════
     function App() {
@@ -1206,27 +1474,23 @@
       const [cats,setCats]             = useState({primaries:[],byPrimary:{},bySecondary:{}});
       const [catsLoading,setCatsLoading] = useState(false);
       const [settings,setSettings]     = useState(loadSettings);
+      const isDesktop                  = useIsDesktop();
 
-      // PWA Navigation
-      // stack items: { type: 'home' | 'list' | 'policy', series?, policy? }
+      // Mobile navigation
       const [homeStack,setHomeStack]   = useState([{type:'home'}]);
       const [tab,setTab]               = useState('home');
-
-      // Policy data
       const [listPolicies,setListPolicies] = useState([]);
       const [listLoading,setListLoading]   = useState(false);
       const [activeSeries,setActiveSeries] = useState(null);
-
       const [activePolicy,setActivePolicy]   = useState(null);
       const [policyLoading,setPolicyLoading] = useState(false);
 
-      // Modals
+      // Modals (shared between mobile and desktop)
       const [policyModal,setPolicyModal]   = useState({open:false,mode:'add'});
       const [usersModal,setUsersModal]     = useState(false);
       const [settingsOpen,setSettingsOpen] = useState(false);
       const [editingPolicy,setEditingPolicy] = useState(null);
 
-      // Dark mode
       useEffect(()=>{ document.documentElement.setAttribute('data-dark',String(dark)); localStorage.setItem('pv-dark',dark); },[dark]);
       useEffect(()=>{
         const root=document.documentElement;
@@ -1236,7 +1500,6 @@
         root.style.setProperty('--policy-text-color',settings.policyFontColor||'');
       },[settings]);
 
-      // Auth
       useEffect(()=>{
         if (!configured){setAuthState('unauthenticated');return;}
         const clearBadSession=async()=>{ try{await db.auth.signOut();}catch(e){} localStorage.clear(); sessionStorage.clear(); setUser(null);setProfile(null);setAuthState('unauthenticated'); };
@@ -1264,11 +1527,7 @@
         setListPolicies(res); setListLoading(false);
       },[]);
 
-      const openSeries=useCallback((series)=>{
-        setActiveSeries(series);
-        loadPolicies(series);
-        setHomeStack(s=>[...s,{type:'list',series}]);
-      },[loadPolicies]);
+      const openSeries=useCallback((series)=>{ setActiveSeries(series); loadPolicies(series); setHomeStack(s=>[...s,{type:'list',series}]); },[loadPolicies]);
 
       const openPolicy=useCallback(async(p)=>{
         setActivePolicy(null); setPolicyLoading(true);
@@ -1278,39 +1537,29 @@
       },[]);
 
       const openPolicyFromSearch=useCallback(async(p)=>{
-        // Switch to home tab and navigate to policy
-        setTab('home');
-        setActivePolicy(null); setPolicyLoading(true);
+        setTab('home'); setActivePolicy(null); setPolicyLoading(true);
         setHomeStack([{type:'home'},{type:'policy',policyId:p.id}]);
         const full=await apiGetPolicy(p.id);
         setActivePolicy(full||p); setPolicyLoading(false);
       },[]);
 
-      const goBack=useCallback(()=>{
-        setHomeStack(s=>{ if(s.length<=1) return s; return s.slice(0,-1); });
-      },[]);
+      const goBack=useCallback(()=>{ setHomeStack(s=>{ if(s.length<=1) return s; return s.slice(0,-1); }); },[]);
 
       const handleSavePolicy=async(saved)=>{
         setPolicyModal({open:false,mode:'add'}); setEditingPolicy(null);
         await loadCats();
-        // Refresh list if on list screen
         if (activeSeries!==undefined) loadPolicies(activeSeries);
         if (saved) {
           const full=await apiGetPolicy(saved.id);
           setActivePolicy(full||saved);
-          // Navigate to policy view
-          setHomeStack(s=>{
-            const base=s.filter(x=>x.type!=='policy');
-            return [...base,{type:'policy',policyId:saved.id}];
-          });
+          setHomeStack(s=>{const base=s.filter(x=>x.type!=='policy'); return [...base,{type:'policy',policyId:saved.id}];});
         }
       };
 
       const handleDeletePolicy=async(id)=>{
         const {error}=await apiDelete(id);
         if (error){alert(`Failed to delete: ${error.message}`);return;}
-        await loadCats();
-        loadPolicies(activeSeries);
+        await loadCats(); loadPolicies(activeSeries);
         if (activePolicy?.id===id){setActivePolicy(null);}
         goBack();
       };
@@ -1318,22 +1567,14 @@
       const handleSignOut=async()=>{ try{await authSignOut();}catch(e){} setUser(null);setProfile(null);setAuthState('unauthenticated'); };
       const toggleDark=()=>setDark(d=>!d);
       const isAdmin=profile?.role==='admin';
-
-      // Current screen from stack
       const currentScreen=homeStack[homeStack.length-1];
 
-      // Handle tab switch
       const handleTabSwitch=(newTab)=>{
         if(newTab==='settings'){setSettingsOpen(true);return;}
-        if(newTab==='home'&&tab==='home'){
-          // Pop to home root
-          setHomeStack([{type:'home'}]);
-          return;
-        }
+        if(newTab==='home'&&tab==='home'){setHomeStack([{type:'home'}]);return;}
         setTab(newTab);
       };
 
-      // ── Render states ──
       if (!configured)               return <SetupScreen/>;
       if (authState==='loading')     return (
         <div style={{minHeight:'100vh',display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',gap:16,color:'var(--text-3)'}}>
@@ -1345,67 +1586,80 @@
       if (authState==='pending')         return <PendingPage profile={profile} dark={dark} onToggleDark={toggleDark} onSignOut={handleSignOut}/>;
 
       return (
-        <div style={{height:'100dvh',display:'flex',flexDirection:'column',overflow:'hidden',paddingTop:'var(--safe-top)'}}>
-
-          {/* Main content area */}
-          <div style={{flex:1,display:'flex',flexDirection:'column',overflow:'hidden',position:'relative'}}>
-
-            {/* HOME TAB */}
-            {tab==='home'&&(
-              <div style={{flex:1,display:'flex',flexDirection:'column',overflow:'hidden'}}>
-                {currentScreen.type==='home'&&(
-                  <HomeScreen cats={cats} loading={catsLoading} dark={dark} onToggleDark={toggleDark} onSeriesSelect={openSeries} isAdmin={isAdmin} onNewPolicy={()=>setPolicyModal({open:true,mode:'add'})} profile={profile}/>
-                )}
-                {currentScreen.type==='list'&&(
-                  <div className="slide-in-right" style={{flex:1,display:'flex',flexDirection:'column',overflow:'hidden'}}>
-                    <PolicyListScreen
-                      series={activeSeries}
-                      policies={listPolicies}
-                      loading={listLoading}
-                      onBack={goBack}
-                      onSelect={openPolicy}
-                      onDelete={handleDeletePolicy}
-                      isAdmin={isAdmin}
-                    />
+        <>
+          {isDesktop ? (
+            <DesktopApp
+              user={user}
+              profile={profile}
+              dark={dark}
+              onToggleDark={toggleDark}
+              cats={cats}
+              catsLoading={catsLoading}
+              isAdmin={isAdmin}
+              userId={user?.id}
+              settings={settings}
+              onSignOut={handleSignOut}
+              onOpenSettings={()=>setSettingsOpen(true)}
+              onOpenUsers={()=>setUsersModal(true)}
+              onNewPolicy={()=>setPolicyModal({open:true,mode:'add'})}
+              onEditPolicy={(p)=>{ setEditingPolicy(p); setPolicyModal({open:true,mode:'edit'}); }}
+              onDeletePolicy={()=>{ loadCats(); }}
+              onSavePolicy={()=>{ loadCats(); }}
+            />
+          ) : (
+            <div style={{height:'100dvh',display:'flex',flexDirection:'column',overflow:'hidden',paddingTop:'var(--safe-top)'}}>
+              <div style={{flex:1,display:'flex',flexDirection:'column',overflow:'hidden',position:'relative'}}>
+                {tab==='home'&&(
+                  <div style={{flex:1,display:'flex',flexDirection:'column',overflow:'hidden'}}>
+                    {currentScreen.type==='home'&&(<HomeScreen cats={cats} loading={catsLoading} dark={dark} onToggleDark={toggleDark} onSeriesSelect={openSeries} isAdmin={isAdmin} onNewPolicy={()=>setPolicyModal({open:true,mode:'add'})} profile={profile}/>)}
+                    {currentScreen.type==='list'&&(
+                      <div className="slide-in-right" style={{flex:1,display:'flex',flexDirection:'column',overflow:'hidden'}}>
+                        <PolicyListScreen series={activeSeries} policies={listPolicies} loading={listLoading} onBack={goBack} onSelect={openPolicy} onDelete={handleDeletePolicy} isAdmin={isAdmin} userId={user?.id}/>
+                      </div>
+                    )}
+                    {currentScreen.type==='policy'&&(
+                      <div className="slide-in-right" style={{flex:1,display:'flex',flexDirection:'column',overflow:'hidden'}}>
+                        <PolicyViewScreen policy={activePolicy} loading={policyLoading} onBack={goBack} onEdit={()=>{ setEditingPolicy(activePolicy); setPolicyModal({open:true,mode:'edit'}); }} onDelete={handleDeletePolicy} onNavigate={openPolicy} isAdmin={isAdmin} userId={user?.id}/>
+                      </div>
+                    )}
                   </div>
                 )}
-                {currentScreen.type==='policy'&&(
-                  <div className="slide-in-right" style={{flex:1,display:'flex',flexDirection:'column',overflow:'hidden'}}>
-                    <PolicyViewScreen
-                      policy={activePolicy}
-                      loading={policyLoading}
-                      onBack={goBack}
-                      onEdit={()=>{ setEditingPolicy(activePolicy); setPolicyModal({open:true,mode:'edit'}); }}
-                      onDelete={handleDeletePolicy}
-                      onNavigate={openPolicy}
-                      isAdmin={isAdmin}
-                    />
-                  </div>
-                )}
+                {tab==='search'&&(<SearchScreen onOpenPolicy={openPolicyFromSearch}/>)}
               </div>
-            )}
+              <BottomNav tab={tab} onTab={handleTabSwitch}/>
+            </div>
+          )}
 
-            {/* SEARCH TAB */}
-            {tab==='search'&&(
-              <SearchScreen onOpenPolicy={openPolicyFromSearch}/>
-            )}
-
-          </div>
-
-          {/* Bottom Navigation */}
-          <BottomNav tab={tab} onTab={handleTabSwitch}/>
-
-          {/* Modals */}
-          <PolicyModal open={policyModal.open} mode={policyModal.mode} editPolicy={policyModal.mode==='edit'?editingPolicy:null} cats={cats} settings={settings} onSave={handleSavePolicy} onClose={()=>{ setPolicyModal(m=>({...m,open:false})); setEditingPolicy(null); }}/>
+          {/* Shared modals */}
+          <PolicyModal
+            open={policyModal.open}
+            mode={policyModal.mode}
+            editPolicy={policyModal.mode==='edit'?editingPolicy:null}
+            cats={cats}
+            settings={settings}
+            userId={user?.id}
+            onSave={handleSavePolicy}
+            onClose={()=>{ setPolicyModal(m=>({...m,open:false})); setEditingPolicy(null); }}
+          />
           <UserManagementModal open={usersModal} currentUserId={user?.id} onClose={()=>setUsersModal(false)}/>
-          <SettingsModal open={settingsOpen} settings={settings} dark={dark} onToggleDark={toggleDark} profile={profile} isAdmin={isAdmin} onManageUsers={()=>{ setUsersModal(true); setSettingsOpen(false); }} onSignOut={handleSignOut} onSave={s=>{ setSettings(s); saveSettingsToStorage(s); }} onClose={()=>setSettingsOpen(false)}/>
-        </div>
+          <SettingsModal
+            open={settingsOpen}
+            settings={settings}
+            dark={dark}
+            onToggleDark={toggleDark}
+            profile={profile}
+            isAdmin={isAdmin}
+            onManageUsers={()=>{ setUsersModal(true); setSettingsOpen(false); }}
+            onSignOut={handleSignOut}
+            onSave={s=>{ setSettings(s); saveSettingsToStorage(s); }}
+            onClose={()=>setSettingsOpen(false)}
+          />
+        </>
       );
     }
 
     ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
 
-    // ── Service Worker registration ────────────────────────────────
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {
         navigator.serviceWorker.register('/sw.js').catch(e => console.warn('SW registration failed:', e));
