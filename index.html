@@ -304,7 +304,7 @@
     const demoteUser  = (id) => db.from('user_profiles').update({role:'user'}).eq('id',id);
 
     // ── API helpers ────────────────────────────────────────────────
-    const COLS = 'id,name,primary_category,secondary_category,tertiary_category,updated_at,content,visibility,owner_id';
+    const COLS = '*';
 
     const apiSearch = async ({ query='', primary='', secondary='', tertiary='' }={}) => {
       if (!db) return [];
@@ -361,22 +361,33 @@
         await db.from('policy_references').insert(referencedIds.map((refId,i)=>({ policy_id:policyId, referenced_policy_id:refId, order_index:i })));
       }
     };
-    const apiGetShares = async (policyId) => {
+    const apiGetGroups = async () => {
       if (!db) return [];
-      const {data} = await db.from('policy_shares').select('user_id,can_edit').eq('policy_id',policyId);
+      const {data} = await db.from('groups').select('*, group_members(user_id, user_profiles(id,email,full_name))').order('is_system',{ascending:false}).order('name');
       return data||[];
     };
-    const apiSaveShares = async (policyId, shares) => {
+    const apiCreateGroup = async (name, description='') => db.from('groups').insert({name,description,is_system:false}).select().single();
+    const apiUpdateGroup = async (id, name, description) => db.from('groups').update({name,description}).eq('id',id);
+    const apiDeleteGroup = async (id) => db.from('groups').delete().eq('id',id);
+    const apiSetGroupMembers = async (groupId, userIds) => {
+      await db.from('group_members').delete().eq('group_id',groupId);
+      if (userIds.length>0) await db.from('group_members').insert(userIds.map(uid=>({group_id:groupId,user_id:uid})));
+    };
+    const apiGetPolicyGroups = async (policyId) => {
+      if (!db) return [];
+      const {data} = await db.from('policy_groups').select('group_id').eq('policy_id',policyId);
+      return (data||[]).map(r=>r.group_id);
+    };
+    const apiSavePolicyGroups = async (policyId, groupIds) => {
       if (!db) return;
-      await db.from('policy_shares').delete().eq('policy_id',policyId);
-      if (shares.length>0) {
-        await db.from('policy_shares').insert(shares.map(s=>({policy_id:policyId, user_id:s.user_id, can_edit:s.can_edit||false})));
-      }
+      await db.from('policy_groups').delete().eq('policy_id',policyId);
+      if (groupIds.length>0) await db.from('policy_groups').insert(groupIds.map(gid=>({policy_id:policyId,group_id:gid})));
     };
     const apiDelete = async (id) => {
       if (!db) return {error:{message:'Not connected'}};
       await db.from('policy_references').delete().or(`policy_id.eq.${id},referenced_policy_id.eq.${id}`);
       await db.from('policy_shares').delete().eq('policy_id',id);
+      await db.from('policy_groups').delete().eq('policy_id',id);
       return db.from('policies').delete().eq('id',id);
     };
     const apiDeleteSeries = async (primary) => {
@@ -439,60 +450,208 @@
     };
 
     // ── Visibility Badge ───────────────────────────────────────────
-    const VisibilityBadge = ({ visibility, small }) => {
-      if (!visibility || visibility === 'family') return null;
-      const cfg = {
-        private: { icon: <I.LockSm/>, label: 'Private', color: 'var(--amber)', bg: 'var(--amber-bg)' },
-        shared:  { icon: <I.UserPlus/>, label: 'Shared',  color: 'var(--accent)', bg: 'var(--accent-bg)' },
-      };
-      const c = cfg[visibility];
-      if (!c) return null;
+    // ── Private badge (only shown when private) ───────────────────
+    const PrivateBadge = ({ visibility, small }) => {
+      if (visibility !== 'private') return null;
       return (
-        <span style={{display:'inline-flex',alignItems:'center',gap:3,padding:small?'2px 6px':'3px 8px',borderRadius:100,background:c.bg,color:c.color,fontSize:small?9.5:10.5,fontWeight:700,letterSpacing:'0.04em',flexShrink:0,border:`1px solid ${c.color}22`}}>
-          {c.icon}&nbsp;{c.label}
+        <span style={{display:'inline-flex',alignItems:'center',gap:3,padding:small?'2px 6px':'3px 8px',borderRadius:100,background:'var(--amber-bg)',color:'var(--amber)',fontSize:small?9.5:10.5,fontWeight:700,letterSpacing:'0.04em',flexShrink:0,border:'1px solid rgba(138,92,10,0.2)'}}>
+          <I.LockSm/>&nbsp;Private
         </span>
       );
     };
 
-    // ── Share Picker ───────────────────────────────────────────────
-    const SharePicker = ({ currentUserId, shares, onChangeShares }) => {
-      const [allUsers, setAllUsers] = useState([]);
-      const [loading, setLoading] = useState(true);
-      useEffect(() => {
-        getApprovedUsers().then(u => { setAllUsers(u.filter(x => x.id !== currentUserId)); setLoading(false); });
-      }, [currentUserId]);
-      const toggle = (userId) => {
-        const exists = shares.find(s => s.user_id === userId);
-        if (exists) onChangeShares(shares.filter(s => s.user_id !== userId));
-        else onChangeShares([...shares, { user_id: userId, can_edit: false }]);
-      };
-      const toggleEdit = (userId) => {
-        onChangeShares(shares.map(s => s.user_id === userId ? { ...s, can_edit: !s.can_edit } : s));
-      };
-      if (loading) return <div style={{color:'var(--text-3)',fontSize:12,display:'flex',alignItems:'center',gap:6}}><I.Spin/> Loading users…</div>;
-      if (allUsers.length === 0) return <div style={{color:'var(--text-3)',fontSize:12}}>No other approved users found.</div>;
+    // ── Group chips (shown in policy list / detail) ────────────────
+    const GroupChips = ({ groupIds, groups, small }) => {
+      if (!groupIds||!groups||groupIds.length===0) return null;
+      const matched = groups.filter(g => groupIds.includes(g.id));
+      if (matched.length===0) return null;
+      const colors = ['#1B5244','#2D5A7B','#5C3D7A','#7A3D3D','#3D5C3D','#7A5C1B'];
       return (
-        <div style={{border:'1px solid var(--border-2)',borderRadius:'var(--r)',overflow:'hidden'}}>
-          {allUsers.map((u, idx) => {
-            const granted = shares.find(s => s.user_id === u.id);
+        <div style={{display:'inline-flex',gap:4,flexWrap:'wrap'}}>
+          {matched.map((g,i)=>(
+            <span key={g.id} style={{display:'inline-flex',alignItems:'center',padding:small?'2px 6px':'3px 8px',borderRadius:100,background:`${colors[i%colors.length]}14`,color:colors[i%colors.length],fontSize:small?9.5:10.5,fontWeight:700,letterSpacing:'0.04em',flexShrink:0,border:`1px solid ${colors[i%colors.length]}30`}}>
+              {g.name}
+            </span>
+          ))}
+        </div>
+      );
+    };
+
+    // ── Group Picker (inside PolicyModal) ─────────────────────────
+    const GroupPicker = ({ groups, selectedGroupIds, onToggle }) => {
+      if (!groups||groups.length===0) return <div style={{color:'var(--text-3)',fontSize:12}}>No groups yet. Create groups in Settings → Manage Groups.</div>;
+      return (
+        <div style={{display:'flex',flexDirection:'column',gap:8}}>
+          {groups.map(g => {
+            const on = selectedGroupIds.includes(g.id);
+            const memberCount = g.group_members?.length||0;
             return (
-              <div key={u.id} style={{display:'flex',alignItems:'center',gap:12,padding:'10px 14px',borderBottom:idx<allUsers.length-1?'1px solid var(--border)':'none',background:granted?'var(--accent-muted)':'transparent',transition:'background 0.12s'}}>
-                <div style={{width:32,height:32,borderRadius:'50%',background:granted?'var(--accent-bg)':'var(--surface-2)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:11,fontWeight:700,color:granted?'var(--accent)':'var(--text-3)',flexShrink:0}}>{initials(u.email)}</div>
+              <label key={g.id} style={{display:'flex',alignItems:'center',gap:12,padding:'11px 14px',border:`1.5px solid ${on?'var(--accent)':'var(--border-2)'}`,borderRadius:'var(--r)',background:on?'var(--accent-muted)':'var(--bg)',cursor:'pointer',transition:'all 0.14s'}}>
+                <input type="checkbox" checked={on} onChange={()=>onToggle(g.id)} style={{accentColor:'var(--accent)',width:16,height:16,flexShrink:0}}/>
                 <div style={{flex:1,minWidth:0}}>
-                  <div style={{fontSize:13,fontWeight:500,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{u.full_name||u.email.split('@')[0]}</div>
-                  <div style={{fontSize:11,color:'var(--text-3)',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{u.email}</div>
+                  <div style={{fontSize:13,fontWeight:600,color:on?'var(--accent-text)':'var(--text)'}}>{g.name}{g.is_system&&<span style={{marginLeft:6,fontSize:10,color:'var(--text-3)',fontWeight:400}}>system</span>}</div>
+                  <div style={{fontSize:11.5,color:'var(--text-3)'}}>{memberCount} {memberCount===1?'member':'members'}{g.description?` · ${g.description}`:''}</div>
                 </div>
-                {granted && (
-                  <button type="button" onClick={()=>toggleEdit(u.id)} style={{fontSize:10,padding:'3px 8px',background:granted.can_edit?'var(--accent)':'var(--surface-3)',color:granted.can_edit?'#fff':'var(--text-3)',border:'none',borderRadius:100,cursor:'pointer',fontFamily:'var(--font-u)',fontWeight:700,letterSpacing:'0.04em',flexShrink:0}}>
-                    {granted.can_edit ? 'Can Edit' : 'View only'}
-                  </button>
-                )}
-                <button type="button" onClick={()=>toggle(u.id)} style={{width:22,height:22,borderRadius:6,border:`2px solid ${granted?'var(--accent)':'var(--border-2)'}`,background:granted?'var(--accent)':'transparent',display:'flex',alignItems:'center',justifyContent:'center',cursor:'pointer',flexShrink:0,transition:'all 0.14s'}}>
-                  {granted && <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3" strokeLinecap="round"><polyline points="20 6 9 17 4 12"/></svg>}
-                </button>
-              </div>
+              </label>
             );
           })}
+        </div>
+      );
+    };
+
+    // ── Group Management Modal ─────────────────────────────────────
+    const GroupManagementModal = ({ open, onClose }) => {
+      const [groups, setGroups] = useState([]);
+      const [allUsers, setAllUsers] = useState([]);
+      const [loading, setLoading] = useState(true);
+      const [editingGroup, setEditingGroup] = useState(null); // {id,name,description,memberIds}
+      const [newName, setNewName] = useState('');
+      const [creating, setCreating] = useState(false);
+      const [busy, setBusy] = useState(false);
+
+      const load = useCallback(async () => {
+        setLoading(true);
+        const [g, u] = await Promise.all([apiGetGroups(), getApprovedUsers()]);
+        setGroups(g); setAllUsers(u); setLoading(false);
+      }, []);
+
+      useEffect(() => { if (open) load(); }, [open]);
+
+      const startEdit = (g) => setEditingGroup({
+        id: g.id, name: g.name, description: g.description||'', is_system: g.is_system,
+        memberIds: (g.group_members||[]).map(m=>m.user_id)
+      });
+
+      const saveEdit = async () => {
+        if (!editingGroup.name.trim()) return;
+        setBusy(true);
+        if (!editingGroup.is_system) await apiUpdateGroup(editingGroup.id, editingGroup.name.trim(), editingGroup.description.trim());
+        await apiSetGroupMembers(editingGroup.id, editingGroup.memberIds);
+        setEditingGroup(null); await load(); setBusy(false);
+      };
+
+      const doCreate = async () => {
+        if (!newName.trim()) return;
+        setBusy(true);
+        const {data} = await apiCreateGroup(newName.trim());
+        setNewName(''); setCreating(false);
+        await load();
+        if (data) startEdit({...data, group_members:[]});
+        setBusy(false);
+      };
+
+      const doDelete = async (id) => {
+        if (!window.confirm('Delete this group? Policies assigned only to this group will become private.')) return;
+        setBusy(true); await apiDeleteGroup(id); await load(); setBusy(false);
+      };
+
+      const toggleMember = (uid) => {
+        setEditingGroup(eg => ({
+          ...eg,
+          memberIds: eg.memberIds.includes(uid) ? eg.memberIds.filter(x=>x!==uid) : [...eg.memberIds, uid]
+        }));
+      };
+
+      if (!open) return null;
+      const inp = {width:'100%',padding:'9px 12px',border:'1px solid var(--border-2)',borderRadius:'var(--r)',background:'var(--bg)',color:'var(--text)',fontFamily:'var(--font-u)',fontSize:13,outline:'none'};
+
+      return (
+        <div onClick={e=>{ if(e.target===e.currentTarget&&!editingGroup) onClose(); }} style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.55)',display:'flex',alignItems:'center',justifyContent:'center',zIndex:600,backdropFilter:'blur(8px)'}}>
+          <div className="slide-up" style={{background:'var(--surface)',borderRadius:'var(--r-xl)',width:'min(100vw,540px)',maxHeight:'90vh',display:'flex',flexDirection:'column',boxShadow:'var(--shadow-lg)',margin:16}}>
+
+            {/* Header */}
+            <div style={{padding:'16px 20px',borderBottom:'1px solid var(--border)',display:'flex',alignItems:'center',justifyContent:'space-between',flexShrink:0}}>
+              {editingGroup ? (
+                <>
+                  <button onClick={()=>setEditingGroup(null)} style={{background:'transparent',border:'none',cursor:'pointer',color:'var(--text-2)',display:'flex',padding:4,marginLeft:-4}}><I.Back/></button>
+                  <h2 style={{fontFamily:'var(--font-d)',fontSize:22,fontWeight:400,flex:1,marginLeft:8}}>{editingGroup.is_system?'Edit Members':'Edit Group'}</h2>
+                  <Btn variant="primary" size="sm" onClick={saveEdit} disabled={busy}>{busy?'Saving…':'Save'}</Btn>
+                </>
+              ) : (
+                <>
+                  <h2 style={{fontFamily:'var(--font-d)',fontSize:22,fontWeight:400}}>Manage Groups</h2>
+                  <button onClick={onClose} style={{background:'transparent',border:'none',cursor:'pointer',color:'var(--text-2)',display:'flex',padding:6}}><I.X/></button>
+                </>
+              )}
+            </div>
+
+            <div style={{flex:1,overflowY:'auto',padding:20}}>
+              {loading ? (
+                <div style={{display:'flex',justifyContent:'center',padding:'2rem',color:'var(--text-3)'}}><I.Spin/></div>
+              ) : editingGroup ? (
+                /* Edit group form */
+                <div style={{display:'flex',flexDirection:'column',gap:14}}>
+                  {!editingGroup.is_system&&(
+                    <>
+                      <div>
+                        <label style={{fontSize:10,fontWeight:700,color:'var(--text-3)',marginBottom:6,display:'block',textTransform:'uppercase',letterSpacing:'0.09em'}}>Group Name</label>
+                        <input className="form-input" style={inp} value={editingGroup.name} onChange={e=>setEditingGroup(eg=>({...eg,name:e.target.value}))} placeholder="e.g. Parents"/>
+                      </div>
+                      <div>
+                        <label style={{fontSize:10,fontWeight:700,color:'var(--text-3)',marginBottom:6,display:'block',textTransform:'uppercase',letterSpacing:'0.09em'}}>Description (optional)</label>
+                        <input className="form-input" style={inp} value={editingGroup.description} onChange={e=>setEditingGroup(eg=>({...eg,description:e.target.value}))} placeholder="e.g. Mum and Dad"/>
+                      </div>
+                    </>
+                  )}
+                  <div>
+                    <label style={{fontSize:10,fontWeight:700,color:'var(--text-3)',marginBottom:6,display:'block',textTransform:'uppercase',letterSpacing:'0.09em'}}>
+                      Members {editingGroup.is_system&&<span style={{fontWeight:400,textTransform:'none',letterSpacing:0}}>— Family group auto-includes all approved users</span>}
+                    </label>
+                    <div style={{border:'1px solid var(--border-2)',borderRadius:'var(--r)',overflow:'hidden'}}>
+                      {allUsers.length===0&&<div style={{padding:'12px 14px',fontSize:13,color:'var(--text-3)'}}>No approved users yet.</div>}
+                      {allUsers.map((u,idx)=>{
+                        const on = editingGroup.memberIds.includes(u.id);
+                        const isSystemGroup = editingGroup.is_system;
+                        return (
+                          <div key={u.id} style={{display:'flex',alignItems:'center',gap:12,padding:'10px 14px',borderBottom:idx<allUsers.length-1?'1px solid var(--border)':'none',background:on?'var(--accent-muted)':'transparent'}}>
+                            <div style={{width:32,height:32,borderRadius:'50%',background:on?'var(--accent-bg)':'var(--surface-2)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:11,fontWeight:700,color:on?'var(--accent)':'var(--text-3)',flexShrink:0}}>{initials(u.email)}</div>
+                            <div style={{flex:1,minWidth:0}}>
+                              <div style={{fontSize:13,fontWeight:500,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{u.full_name||u.email.split('@')[0]}</div>
+                              <div style={{fontSize:11,color:'var(--text-3)'}}>{u.email}</div>
+                            </div>
+                            <button type="button" disabled={isSystemGroup} onClick={()=>toggleMember(u.id)} style={{width:22,height:22,borderRadius:6,border:`2px solid ${on?'var(--accent)':'var(--border-2)'}`,background:on?'var(--accent)':'transparent',display:'flex',alignItems:'center',justifyContent:'center',cursor:isSystemGroup?'not-allowed':'pointer',opacity:isSystemGroup?0.5:1,flexShrink:0,transition:'all 0.14s'}}>
+                              {on&&<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3" strokeLinecap="round"><polyline points="20 6 9 17 4 12"/></svg>}
+                            </button>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                /* Group list */
+                <div style={{display:'flex',flexDirection:'column',gap:10}}>
+                  {groups.map(g=>{
+                    const memberCount = g.group_members?.length||0;
+                    return (
+                      <div key={g.id} style={{border:'1px solid var(--border-2)',borderRadius:'var(--r)',padding:'12px 14px',display:'flex',alignItems:'center',gap:12,background:'var(--bg)'}}>
+                        <div style={{flex:1,minWidth:0}}>
+                          <div style={{fontSize:13,fontWeight:600,display:'flex',alignItems:'center',gap:6}}>
+                            {g.name}
+                            {g.is_system&&<span style={{fontSize:9.5,padding:'1px 6px',background:'var(--accent-muted)',color:'var(--accent)',borderRadius:100,fontWeight:700}}>system</span>}
+                          </div>
+                          <div style={{fontSize:11.5,color:'var(--text-3)',marginTop:2}}>{memberCount} {memberCount===1?'member':'members'}{g.description?` · ${g.description}`:''}</div>
+                        </div>
+                        <Btn variant="ghost" size="sm" onClick={()=>startEdit(g)}><I.Edit/> Edit</Btn>
+                        {!g.is_system&&<Btn variant="danger" size="sm" onClick={()=>doDelete(g.id)} disabled={busy}>Delete</Btn>}
+                      </div>
+                    );
+                  })}
+                  {creating?(
+                    <div style={{border:'1px solid var(--accent)',borderRadius:'var(--r)',padding:'12px 14px',background:'var(--accent-muted)',display:'flex',gap:8,alignItems:'center'}}>
+                      <input autoFocus className="form-input" style={{...inp,flex:1}} value={newName} onChange={e=>setNewName(e.target.value)} onKeyDown={e=>{ if(e.key==='Enter') doCreate(); if(e.key==='Escape'){setCreating(false);setNewName('');} }} placeholder="Group name, e.g. Parents"/>
+                      <Btn variant="primary" size="sm" onClick={doCreate} disabled={busy||!newName.trim()}>Create</Btn>
+                      <Btn variant="ghost" size="sm" onClick={()=>{setCreating(false);setNewName('');}}>Cancel</Btn>
+                    </div>
+                  ):(
+                    <button onClick={()=>setCreating(true)} style={{background:'transparent',border:'1px dashed var(--border-2)',borderRadius:'var(--r)',cursor:'pointer',color:'var(--text-3)',display:'flex',alignItems:'center',gap:6,padding:'10px 14px',fontSize:13,fontFamily:'var(--font-u)',WebkitTapHighlightColor:'transparent'}}>
+                      <I.PlusSm/> New Group
+                    </button>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
         </div>
       );
     };
@@ -703,7 +862,7 @@
                 <div style={{padding:'10px 20px 0',display:'flex',justifyContent:'center'}}><div style={{width:36,height:4,borderRadius:2,background:'var(--border-2)'}}/></div>
                 <div style={{padding:'12px 16px 6px',borderBottom:'1px solid var(--border)',display:'flex',alignItems:'center',gap:8}}>
                   <p style={{fontSize:13,fontWeight:600,color:'var(--text)',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',flex:1}}>{policy.name}</p>
-                  <VisibilityBadge visibility={policy.visibility} small/>
+                  <PrivateBadge visibility={policy.visibility} small/>
                 </div>
                 <button onClick={handleShare} className="action-menu-item"><I.Share/> Share</button>
                 <button onClick={handleExport} className="action-menu-item"><I.Download/> Export as HTML</button>
@@ -770,7 +929,7 @@
     };
 
     // ── Settings Modal ─────────────────────────────────────────────
-    const SettingsModal = ({ open, settings, dark, onToggleDark, profile, isAdmin, onManageUsers, onSignOut, onSave, onClose }) => {
+    const SettingsModal = ({ open, settings, dark, onToggleDark, profile, isAdmin, onManageUsers, onManageGroups, onSignOut, onSave, onClose }) => {
       const [tab,setTab]=useState('appearance'), [prefixes,setPrefixes]=useState([]), [policyFont,setPolicyFont]=useState('serif'), [fontColor,setFontColor]=useState(''), [fontSize,setFontSize]=useState('14.5'), [pwForm,setPwForm]=useState({current:'',next:'',confirm:''}), [pwMsg,setPwMsg]=useState({text:'',ok:false}), [pwLoading,setPwLoading]=useState(false);
       const inp={width:'100%',padding:'9px 12px',border:'1px solid var(--border-2)',borderRadius:'var(--r)',background:'var(--bg)',color:'var(--text)',fontFamily:'var(--font-u)',fontSize:13,outline:'none'};
       const lbl={fontSize:10,fontWeight:700,color:'var(--text-3)',marginBottom:6,display:'block',textTransform:'uppercase',letterSpacing:'0.09em'};
@@ -859,7 +1018,7 @@
                     <Btn variant="default" onClick={handlePwChange} disabled={pwLoading} full>{pwLoading?<><I.Spin/> Updating…</>:'Update Password'}</Btn>
                   </div>
                 </div>
-                {isAdmin&&<div style={{borderTop:'1px solid var(--border)',paddingTop:18}}><label style={lbl}>Administration</label><button type="button" onClick={onManageUsers} style={{width:'100%',padding:'13px 16px',border:'1px solid var(--border-2)',borderRadius:'var(--r)',background:'var(--bg)',color:'var(--text)',cursor:'pointer',fontFamily:'var(--font-u)',fontSize:14,fontWeight:500,display:'flex',alignItems:'center',gap:10,WebkitTapHighlightColor:'transparent'}}><I.Users/> Manage Users<span style={{marginLeft:'auto',color:'var(--text-3)'}}>›</span></button></div>}
+                {isAdmin&&<div style={{borderTop:'1px solid var(--border)',paddingTop:18,display:'flex',flexDirection:'column',gap:8}}><label style={lbl}>Administration</label><button type="button" onClick={onManageUsers} style={{width:'100%',padding:'13px 16px',border:'1px solid var(--border-2)',borderRadius:'var(--r)',background:'var(--bg)',color:'var(--text)',cursor:'pointer',fontFamily:'var(--font-u)',fontSize:14,fontWeight:500,display:'flex',alignItems:'center',gap:10,WebkitTapHighlightColor:'transparent'}}><I.Users/> Manage Users<span style={{marginLeft:'auto',color:'var(--text-3)'}}>›</span></button><button type="button" onClick={onManageGroups} style={{width:'100%',padding:'13px 16px',border:'1px solid var(--border-2)',borderRadius:'var(--r)',background:'var(--bg)',color:'var(--text)',cursor:'pointer',fontFamily:'var(--font-u)',fontSize:14,fontWeight:500,display:'flex',alignItems:'center',gap:10,WebkitTapHighlightColor:'transparent'}}><I.Share/> Manage Groups<span style={{marginLeft:'auto',color:'var(--text-3)'}}>›</span></button></div>}
                 <div style={{borderTop:'1px solid var(--border)',paddingTop:18}}><Btn variant="danger" full onClick={()=>{ onClose(); onSignOut(); }}><I.LogOut/> Sign Out</Btn></div>
               </div>
             )}
@@ -874,20 +1033,21 @@
 
     // ── Policy Modal (add / edit) ──────────────────────────────────
     const PolicyModal = ({ open, mode, editPolicy, cats, settings, onSave, onClose, userId }) => {
-      const blank={name:'',body:'',series_entries:[{name:'',number:''}],date:'',issue:0,doc_prefix:'',roles:'',author_name:'',author_role:'',visibility:'family'};
-      const [form,setForm]=useState(blank), [refs,setRefs]=useState([]), [refTypes,setRefTypes]=useState({}), [shares,setShares]=useState([]), [showIssue,setShowIssue]=useState(false), [issueInput,setIssueInput]=useState(''), [saving,setSaving]=useState(false), [err,setErr]=useState(''), [sDragIdx,setSDragIdx]=useState(null), [sDragOver,setSDragOver]=useState(null);
+      const blank={name:'',body:'',series_entries:[{name:'',number:''}],date:'',issue:0,doc_prefix:'',roles:'',author_name:'',author_role:'',visibility:'groups'};
+      const [form,setForm]=useState(blank), [refs,setRefs]=useState([]), [refTypes,setRefTypes]=useState({}), [selectedGroupIds,setSelectedGroupIds]=useState([]), [allGroups,setAllGroups]=useState([]), [showIssue,setShowIssue]=useState(false), [issueInput,setIssueInput]=useState(''), [saving,setSaving]=useState(false), [err,setErr]=useState(''), [sDragIdx,setSDragIdx]=useState(null), [sDragOver,setSDragOver]=useState(null);
       const nameRef=useRef(null);
       useEffect(()=>{
         if (!open) return;
         if (mode==='edit'&&editPolicy) {
           const m=parseContent(editPolicy.content||'');
           const series_entries=(m.series&&m.series.length>0)?m.series:[{name:editPolicy.primary_category||'',number:editPolicy.secondary_category||''}];
-          setForm({name:editPolicy.name||'',series_entries,date:toISODate(m.date)||'',issue:m.issue||0,doc_prefix:m.doc_prefix||'',roles:m.roles||'',author_name:m.author_name||'',author_role:m.author_role||'',body:m.body||'',visibility:editPolicy.visibility||'family'});
+          setForm({name:editPolicy.name||'',series_entries,date:toISODate(m.date)||'',issue:m.issue||0,doc_prefix:m.doc_prefix||'',roles:m.roles||'',author_name:m.author_name||'',author_role:m.author_role||'',body:m.body||'',visibility:editPolicy.visibility||'groups'});
           setRefTypes(m.ref_types||{});
           if(m.issue>0){setShowIssue(true);setIssueInput(String(m.issue));}else{setShowIssue(false);setIssueInput('');}
           apiGetReferences(editPolicy.id).then(setRefs);
-          apiGetShares(editPolicy.id).then(setShares);
-        } else { setForm(blank); setRefs([]); setRefTypes({}); setShares([]); setShowIssue(false); setIssueInput(''); }
+          apiGetPolicyGroups(editPolicy.id).then(setSelectedGroupIds);
+        } else { setForm(blank); setRefs([]); setRefTypes({}); setSelectedGroupIds([]); setShowIssue(false); setIssueInput(''); }
+        apiGetGroups().then(setAllGroups);
         setErr(''); setSaving(false);
         setTimeout(()=>nameRef.current?.focus(),80);
       },[open]);
@@ -912,19 +1072,15 @@
         const {data,error}=await apiSave(dbForm,mode==='edit'?editPolicy.id:null,userId);
         if (error){setErr(error.message);setSaving(false);return;}
         await apiSaveReferences(data.id,refs.map(r=>r.id));
-        if (form.visibility==='shared') await apiSaveShares(data.id, shares);
-        else await apiSaveShares(data.id, []);
+        if (form.visibility==='groups') await apiSavePolicyGroups(data.id, selectedGroupIds);
+        else await apiSavePolicyGroups(data.id, []);
         setSaving(false); onSave(data);
       };
       if (!open) return null;
       const inp={width:'100%',padding:'10px 12px',border:'1px solid var(--border-2)',borderRadius:'var(--r)',background:'var(--bg)',color:'var(--text)',fontFamily:'var(--font-u)',fontSize:14,outline:'none'};
       const lbl={fontSize:10,fontWeight:700,color:'var(--text-3)',marginBottom:6,display:'block',textTransform:'uppercase',letterSpacing:'0.09em'};
       const divider=(label)=>(<div style={{display:'flex',alignItems:'center',gap:10,marginTop:4}}><span style={{fontSize:9.5,letterSpacing:'0.12em',textTransform:'uppercase',fontWeight:700,color:'var(--text-3)',whiteSpace:'nowrap'}}>{label}</span><div style={{flex:1,height:1,background:'var(--border-2)'}}/></div>);
-      const visOptions=[
-        {val:'family',icon:<I.Globe/>,label:'Family',desc:'All approved members of this vault can read'},
-        {val:'shared',icon:<I.UserPlus/>,label:'Specific people',desc:'Only the people you choose below'},
-        {val:'private',icon:<I.LockSm/>,label:'Private',desc:'Only you (and administrators)'},
-      ];
+      const toggleGroup = (gid) => setSelectedGroupIds(ids => ids.includes(gid) ? ids.filter(x=>x!==gid) : [...ids, gid]);
       return (
         <div onClick={e=>{ if(e.target===e.currentTarget) onClose(); }} onKeyDown={e=>{ if(e.key==='Escape') onClose(); if((e.metaKey||e.ctrlKey)&&e.key==='Enter') save(); }} style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.55)',display:'flex',alignItems:'flex-end',justifyContent:'center',zIndex:400,backdropFilter:'blur(8px)',WebkitBackdropFilter:'blur(8px)'}}>
           <div className="slide-in-up" style={{background:'var(--surface)',borderRadius:'var(--r-xl) var(--r-xl) 0 0',width:'100%',maxWidth:700,maxHeight:'96vh',display:'flex',flexDirection:'column',boxShadow:'var(--shadow-lg)'}}>
@@ -984,22 +1140,19 @@
                 <div><label style={lbl}>Author Role</label><input className="form-input" style={{...inp,textTransform:'uppercase'}} value={form.author_role} onChange={f('author_role')} placeholder="CHIEF EXECUTIVE"/></div>
               </div>
               {divider('Visibility & Access')}
-              <div style={{display:'flex',flexDirection:'column',gap:8}}>
-                {visOptions.map(opt=>(
-                  <label key={opt.val} style={{display:'flex',alignItems:'center',gap:12,padding:'11px 14px',border:`1.5px solid ${form.visibility===opt.val?'var(--accent)':'var(--border-2)'}`,borderRadius:'var(--r)',background:form.visibility===opt.val?'var(--accent-muted)':'var(--bg)',cursor:'pointer',transition:'all 0.14s'}}>
+              <div style={{display:'flex',gap:8}}>
+                {[{val:'groups',label:'Visible to groups'},{val:'private',label:'Private (only me)'}].map(opt=>(
+                  <label key={opt.val} style={{flex:1,display:'flex',alignItems:'center',gap:8,padding:'10px 13px',border:`1.5px solid ${form.visibility===opt.val?'var(--accent)':'var(--border-2)'}`,borderRadius:'var(--r)',background:form.visibility===opt.val?'var(--accent-muted)':'var(--bg)',cursor:'pointer',transition:'all 0.14s'}}>
                     <input type="radio" name="visibility" value={opt.val} checked={form.visibility===opt.val} onChange={()=>setForm(p=>({...p,visibility:opt.val}))} style={{accentColor:'var(--accent)'}}/>
-                    <span style={{color:'var(--text-3)',display:'flex',flexShrink:0}}>{opt.icon}</span>
-                    <div style={{minWidth:0}}>
-                      <div style={{fontSize:13,fontWeight:600,color:form.visibility===opt.val?'var(--accent-text)':'var(--text)'}}>{opt.label}</div>
-                      <div style={{fontSize:11.5,color:'var(--text-3)',lineHeight:1.4}}>{opt.desc}</div>
-                    </div>
+                    <span style={{fontSize:13,fontWeight:600,color:form.visibility===opt.val?'var(--accent-text)':'var(--text)'}}>{opt.label}</span>
                   </label>
                 ))}
               </div>
-              {form.visibility==='shared'&&(
+              {form.visibility==='groups'&&(
                 <div>
-                  <label style={lbl}>Who can see this policy</label>
-                  <SharePicker currentUserId={userId} shares={shares} onChangeShares={setShares}/>
+                  <label style={lbl}>Which groups can see this policy</label>
+                  <GroupPicker groups={allGroups} selectedGroupIds={selectedGroupIds} onToggle={toggleGroup}/>
+                  {allGroups.length===0&&<p style={{fontSize:12,color:'var(--text-3)',marginTop:8}}>Run the groups migration in Supabase first, then create groups in Settings → Manage Groups.</p>}
                 </div>
               )}
               {err&&<div style={{fontSize:13,color:'var(--danger)',background:'var(--danger-bg)',padding:'10px 13px',borderRadius:'var(--r)',borderLeft:'3px solid var(--danger)'}}>{err}</div>}
@@ -1139,7 +1292,7 @@
                       style={{flex:1,padding:'14px 16px',background:'transparent',border:'none',cursor:'pointer',textAlign:'left',display:'block',minWidth:0,WebkitTapHighlightColor:'transparent'}}>
                       <div style={{display:'flex',alignItems:'center',gap:6,marginBottom:4,minWidth:0}}>
                         <span style={{fontSize:14,fontWeight:600,color:'var(--text)',flex:1,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{p.name}</span>
-                        <VisibilityBadge visibility={p.visibility} small/>
+                        <PrivateBadge visibility={p.visibility} small/>
                         <span style={{fontSize:10,fontWeight:700,color:'var(--text-3)',textTransform:'uppercase',letterSpacing:'0.07em',flexShrink:0}}>{docType}</span>
                       </div>
                       <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:8}}>
@@ -1170,7 +1323,7 @@
             <button onClick={onBack} style={{width:36,height:36,borderRadius:'var(--r)',background:'transparent',border:'none',cursor:'pointer',color:'var(--text-2)',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0,WebkitTapHighlightColor:'transparent',marginLeft:-4}}><I.Back/></button>
             <div style={{flex:1,minWidth:0,display:'flex',alignItems:'center',gap:8}}>
               <p style={{fontSize:14,fontWeight:600,color:'var(--text)',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',flex:1}}>{policy?.name||''}</p>
-              <VisibilityBadge visibility={policy?.visibility} small/>
+              <PrivateBadge visibility={policy?.visibility} small/>
             </div>
             <button onClick={()=>setActionSheet(true)} style={{width:36,height:36,borderRadius:'var(--r)',background:'transparent',border:'none',cursor:'pointer',color:'var(--text-2)',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0,WebkitTapHighlightColor:'transparent'}}><I.Dots/></button>
           </div>
@@ -1232,7 +1385,7 @@
                     <button key={p.id} onClick={()=>onOpenPolicy(p)} className="tap-row" style={{width:'100%',padding:'14px 16px',background:'transparent',border:'none',borderBottom:'1px solid var(--border)',cursor:'pointer',textAlign:'left',display:'block',WebkitTapHighlightColor:'transparent'}}>
                       <div style={{display:'flex',alignItems:'center',gap:6,marginBottom:4}}>
                         <span style={{fontSize:14,fontWeight:600,color:'var(--text)',flex:1,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{p.name}</span>
-                        <VisibilityBadge visibility={p.visibility} small/>
+                        <PrivateBadge visibility={p.visibility} small/>
                         <span style={{fontSize:10,fontWeight:700,color:'var(--text-3)',textTransform:'uppercase',letterSpacing:'0.07em',flexShrink:0}}>{docType}</span>
                       </div>
                       <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:8}}>
@@ -1264,7 +1417,7 @@
       return isDesktop;
     };
 
-    const DesktopApp = ({ user, profile, dark, onToggleDark, cats, catsLoading, isAdmin, userId, settings, onSignOut, onOpenSettings, onOpenUsers, onNewPolicy, onEditPolicy, onDeletePolicy, onSavePolicy }) => {
+    const DesktopApp = ({ user, profile, dark, onToggleDark, cats, catsLoading, isAdmin, userId, settings, groups, onSignOut, onOpenSettings, onOpenUsers, onManageGroups, onNewPolicy, onEditPolicy, onDeletePolicy, onSavePolicy }) => {
       const colors = ['#1B5244','#2D5A7B','#5C3D7A','#7A3D3D','#3D5C3D','#7A5C1B','#3D4C7A'];
       const [selectedCategory, setSelectedCategory] = useState(null);
       const [policies, setPolicies] = useState([]);
@@ -1277,6 +1430,7 @@
       const [searchResults, setSearchResults] = useState([]);
       const [searching, setSearching] = useState(false);
       const [actionMenu, setActionMenu] = useState(false);
+      const [policyGroupIds, setPolicyGroupIds] = useState([]);
       const searchRef = useRef(null);
 
       const loadPolicies = useCallback(async (cat) => {
@@ -1297,11 +1451,12 @@
       useEffect(() => { doSearch(searchQuery); }, [searchQuery]);
 
       const openPolicy = async (p) => {
-        setSelectedPolicy(null); setPolicyLoading(true);
+        setSelectedPolicy(null); setPolicyLoading(true); setPolicyGroupIds([]);
         const full = await apiGetPolicy(p.id);
         setSelectedPolicy(full || p); setPolicyLoading(false);
         setRefsLoading(true);
         apiGetReferences((full||p).id).then(r => { setRefs(r); setRefsLoading(false); });
+        apiGetPolicyGroups((full||p).id).then(setPolicyGroupIds);
       };
 
       const handleDelete = async (id) => {
@@ -1405,7 +1560,7 @@
                       <button key={p.id} onClick={()=>openPolicy(p)} className={`desktop-list-item${isActive?' active':''}`}>
                         <div style={{display:'flex',alignItems:'center',gap:6,marginBottom:3,minWidth:0}}>
                           <span style={{fontSize:13.5,fontWeight:600,color:isActive?'var(--accent-text)':'var(--text)',flex:1,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{p.name}</span>
-                          <VisibilityBadge visibility={p.visibility} small/>
+                          <PrivateBadge visibility={p.visibility} small/>
                         </div>
                         <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:6}}>
                           <span style={{fontSize:11.5,color:'var(--text-3)',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{p.primary_category}{p.secondary_category?` · ${p.secondary_category}`:''}</span>
@@ -1426,7 +1581,8 @@
                 <div style={{maxWidth:740,margin:'0 auto',padding:'36px 40px 60px'}} className="fade-in">
                   {/* Detail toolbar */}
                   <div style={{display:'flex',alignItems:'center',justifyContent:'flex-end',gap:8,marginBottom:28}}>
-                    <VisibilityBadge visibility={selectedPolicy.visibility}/>
+                    <PrivateBadge visibility={selectedPolicy.visibility}/>
+                    <GroupChips groupIds={policyGroupIds} groups={groups} small={false}/>
                     <div style={{flex:1}}/>
                     <Btn variant="ghost" size="sm" onClick={()=>{ const h=generatePolicyHTML(selectedPolicy,refs); const w=window.open('','_blank'); w.document.write(h); w.document.close(); w.focus(); setTimeout(()=>w.print(),400); }}><I.Printer/> Print</Btn>
                     <Btn variant="ghost" size="sm" onClick={()=>{ const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([generatePolicyHTML(selectedPolicy,refs)],{type:'text/html'})); a.download=`${selectedPolicy.name.replace(/[^a-z0-9]/gi,'_')}.html`; a.click(); }}><I.Download/> Export</Btn>
@@ -1488,7 +1644,9 @@
       // Modals (shared between mobile and desktop)
       const [policyModal,setPolicyModal]   = useState({open:false,mode:'add'});
       const [usersModal,setUsersModal]     = useState(false);
+      const [groupsModal,setGroupsModal]   = useState(false);
       const [settingsOpen,setSettingsOpen] = useState(false);
+      const [appGroups,setAppGroups]       = useState([]);
       const [editingPolicy,setEditingPolicy] = useState(null);
 
       useEffect(()=>{ document.documentElement.setAttribute('data-dark',String(dark)); localStorage.setItem('pv-dark',dark); },[dark]);
@@ -1519,7 +1677,8 @@
       },[]);
 
       const loadCats=useCallback(async()=>{ setCatsLoading(true); setCats(await apiGetCats()); setCatsLoading(false); },[]);
-      useEffect(()=>{ if(authState==='authenticated') loadCats(); },[authState]);
+      const loadGroups=useCallback(async()=>{ const g=await apiGetGroups(); setAppGroups(g); },[]);
+      useEffect(()=>{ if(authState==='authenticated'){ loadCats(); loadGroups(); } },[authState]);
 
       const loadPolicies=useCallback(async(series)=>{
         setListLoading(true);
@@ -1598,13 +1757,15 @@
               isAdmin={isAdmin}
               userId={user?.id}
               settings={settings}
+              groups={appGroups}
               onSignOut={handleSignOut}
               onOpenSettings={()=>setSettingsOpen(true)}
               onOpenUsers={()=>setUsersModal(true)}
+              onManageGroups={()=>setGroupsModal(true)}
               onNewPolicy={()=>setPolicyModal({open:true,mode:'add'})}
               onEditPolicy={(p)=>{ setEditingPolicy(p); setPolicyModal({open:true,mode:'edit'}); }}
               onDeletePolicy={()=>{ loadCats(); }}
-              onSavePolicy={()=>{ loadCats(); }}
+              onSavePolicy={()=>{ loadCats(); loadGroups(); }}
             />
           ) : (
             <div style={{height:'100dvh',display:'flex',flexDirection:'column',overflow:'hidden',paddingTop:'var(--safe-top)'}}>
@@ -1642,6 +1803,7 @@
             onClose={()=>{ setPolicyModal(m=>({...m,open:false})); setEditingPolicy(null); }}
           />
           <UserManagementModal open={usersModal} currentUserId={user?.id} onClose={()=>setUsersModal(false)}/>
+          <GroupManagementModal open={groupsModal} onClose={()=>{ setGroupsModal(false); loadGroups(); }}/>
           <SettingsModal
             open={settingsOpen}
             settings={settings}
@@ -1650,6 +1812,7 @@
             profile={profile}
             isAdmin={isAdmin}
             onManageUsers={()=>{ setUsersModal(true); setSettingsOpen(false); }}
+            onManageGroups={()=>{ setGroupsModal(true); setSettingsOpen(false); }}
             onSignOut={handleSignOut}
             onSave={s=>{ setSettings(s); saveSettingsToStorage(s); }}
             onClose={()=>setSettingsOpen(false)}
