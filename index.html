@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -186,10 +186,16 @@
     /* ── Desktop layout ──────────────────────────────────────── */
     .desktop-root { height: 100dvh; display: flex; flex-direction: column; overflow: hidden; }
     .desktop-topbar { height: 52px; border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 14px; padding: 0 20px; flex-shrink: 0; background: var(--surface); }
-    .desktop-body { flex: 1; display: grid; grid-template-columns: 230px 310px 1fr; overflow: hidden; }
-    .desktop-sidebar { overflow-y: auto; border-right: 1px solid var(--border); background: var(--bg); }
-    .desktop-list { overflow-y: auto; border-right: 1px solid var(--border); background: var(--surface); }
-    .desktop-detail { overflow-y: auto; background: var(--bg); }
+    .desktop-body { flex: 1; display: grid; overflow: hidden; }
+    .desktop-sidebar { overflow-y: auto; background: var(--bg); overflow-x: hidden; transition: width 0.22s cubic-bezier(0.22,1,0.36,1); }
+    .desktop-list { overflow-y: auto; background: var(--surface); overflow-x: hidden; transition: width 0.22s cubic-bezier(0.22,1,0.36,1); }
+    .desktop-detail { overflow-y: auto; background: var(--bg); min-width: 0; }
+    .panel-collapse-bar { flex-shrink: 0; width: 18px; border-right: 1px solid var(--border); background: var(--bg); display: flex; align-items: center; justify-content: center; cursor: pointer; transition: background 0.13s; position: relative; }
+    .panel-collapse-bar:hover { background: var(--surface-2); }
+    .panel-collapse-bar .bar-handle { width: 3px; height: 32px; border-radius: 3px; background: var(--border-2); transition: background 0.13s; }
+    .panel-collapse-bar:hover .bar-handle { background: var(--accent); }
+    .panel-collapse-bar .bar-arrow { position: absolute; color: var(--text-3); transition: color 0.13s; }
+    .panel-collapse-bar:hover .bar-arrow { color: var(--accent); }
     .desktop-sidebar-item { width: 100%; text-align: left; padding: 10px 16px; background: transparent; border: none; cursor: pointer; font-family: var(--font-u); font-size: 13.5px; color: var(--text-2); display: flex; align-items: center; gap: 10px; border-radius: var(--r); transition: background 0.12s, color 0.12s; }
     .desktop-sidebar-item:hover { background: var(--surface-2); color: var(--text); }
     .desktop-sidebar-item.active { background: var(--accent-muted); color: var(--accent); font-weight: 700; }
@@ -1431,6 +1437,8 @@
       const [searching, setSearching] = useState(false);
       const [actionMenu, setActionMenu] = useState(false);
       const [policyGroupIds, setPolicyGroupIds] = useState([]);
+      const [sidebarOpen, setSidebarOpen] = useState(true);
+      const [listOpen, setListOpen] = useState(true);
       const searchRef = useRef(null);
 
       const loadPolicies = useCallback(async (cat) => {
@@ -1512,10 +1520,10 @@
           </div>
 
           {/* 3-pane body */}
-          <div className="desktop-body">
+          <div className="desktop-body" style={{gridTemplateColumns:`${sidebarOpen?'230px':'0px'} 18px ${listOpen?'310px':'0px'} 18px 1fr`}}>
             {/* Sidebar */}
-            <div className="desktop-sidebar">
-              <div style={{padding:'12px 10px 8px'}}>
+            <div className="desktop-sidebar" style={{width:sidebarOpen?230:0,borderRight:'none'}}>
+              <div style={{width:230,padding:'12px 10px 8px'}}>
                 <div style={{fontSize:9.5,fontWeight:700,color:'var(--text-3)',letterSpacing:'0.1em',textTransform:'uppercase',padding:'0 8px',marginBottom:6}}>Series</div>
                 <button onClick={()=>{ setSelectedCategory(null); setSearchQuery(''); }} className={`desktop-sidebar-item${selectedCategory===null&&!searchQuery?' active':''}`} style={{width:'100%',borderRadius:'var(--r)'}}>
                   <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
@@ -1534,43 +1542,61 @@
               </div>
             </div>
 
+            {/* Sidebar toggle bar */}
+            <div className="panel-collapse-bar" title={sidebarOpen?'Collapse series panel':'Expand series panel'} onClick={()=>setSidebarOpen(o=>!o)}>
+              <div className="bar-handle"/>
+              <span className="bar-arrow" style={{fontSize:9,top:'50%',transform:'translateY(-50%)',marginTop:-20}}>
+                {sidebarOpen?'◀':'▶'}
+              </span>
+            </div>
+
             {/* Policy List */}
-            <div className="desktop-list">
-              <div style={{padding:'12px 16px 10px',borderBottom:'1px solid var(--border)',display:'flex',alignItems:'center',justifyContent:'space-between',flexShrink:0,background:'var(--surface)'}}>
-                <div>
-                  <div style={{fontSize:13,fontWeight:700,color:'var(--text)'}}>{searchQuery ? 'Search Results' : (selectedCategory || 'All Policies')}</div>
-                  <div style={{fontSize:11,color:'var(--text-3)',marginTop:1}}>{isSearching ? 'Loading…' : `${displayList.length} ${displayList.length===1?'policy':'policies'}`}</div>
+            <div className="desktop-list" style={{width:listOpen?310:0,borderRight:'none'}}>
+              <div style={{width:310}}>
+                <div style={{padding:'12px 16px 10px',borderBottom:'1px solid var(--border)',display:'flex',alignItems:'center',justifyContent:'space-between',flexShrink:0,background:'var(--surface)'}}>
+                  <div>
+                    <div style={{fontSize:13,fontWeight:700,color:'var(--text)'}}>{searchQuery ? 'Search Results' : (selectedCategory || 'All Policies')}</div>
+                    <div style={{fontSize:11,color:'var(--text-3)',marginTop:1}}>{isSearching ? 'Loading…' : `${displayList.length} ${displayList.length===1?'policy':'policies'}`}</div>
+                  </div>
+                </div>
+                <div style={{overflowY:'auto',height:'calc(100vh - 52px - 57px)'}}>
+                  {isSearching ? (
+                    <div style={{display:'flex',justifyContent:'center',padding:'2rem',color:'var(--text-3)'}}><I.Spin/></div>
+                  ) : displayList.length === 0 ? (
+                    <div style={{display:'flex',flexDirection:'column',alignItems:'center',padding:'3rem 1rem',gap:8,color:'var(--text-3)'}}>
+                      <I.File2/>
+                      <span style={{fontSize:13,textAlign:'center'}}>{searchQuery ? `No results for "${searchQuery}"` : 'No policies in this series'}</span>
+                    </div>
+                  ) : (
+                    displayList.map(p => {
+                      const meta = parseContent(p.content||'');
+                      const docType = stripOf(meta.doc_prefix||'Policy');
+                      const policyDate = meta.date ? fmtDate(meta.date) : '';
+                      const isActive = selectedPolicy?.id === p.id;
+                      return (
+                        <button key={p.id} onClick={()=>openPolicy(p)} className={`desktop-list-item${isActive?' active':''}`}>
+                          <div style={{display:'flex',alignItems:'center',gap:6,marginBottom:3,minWidth:0}}>
+                            <span style={{fontSize:13.5,fontWeight:600,color:isActive?'var(--accent-text)':'var(--text)',flex:1,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{p.name}</span>
+                            <PrivateBadge visibility={p.visibility} small/>
+                          </div>
+                          <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:6}}>
+                            <span style={{fontSize:11.5,color:'var(--text-3)',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{p.primary_category}{p.secondary_category?` · ${p.secondary_category}`:''}</span>
+                            <span style={{fontSize:10.5,color:'var(--text-3)',flexShrink:0}}>{policyDate||docType}</span>
+                          </div>
+                        </button>
+                      );
+                    })
+                  )}
                 </div>
               </div>
-              <div style={{overflowY:'auto',height:'calc(100% - 57px)'}}>
-                {isSearching ? (
-                  <div style={{display:'flex',justifyContent:'center',padding:'2rem',color:'var(--text-3)'}}><I.Spin/></div>
-                ) : displayList.length === 0 ? (
-                  <div style={{display:'flex',flexDirection:'column',alignItems:'center',padding:'3rem 1rem',gap:8,color:'var(--text-3)'}}>
-                    <I.File2/>
-                    <span style={{fontSize:13,textAlign:'center'}}>{searchQuery ? `No results for "${searchQuery}"` : 'No policies in this series'}</span>
-                  </div>
-                ) : (
-                  displayList.map(p => {
-                    const meta = parseContent(p.content||'');
-                    const docType = stripOf(meta.doc_prefix||'Policy');
-                    const policyDate = meta.date ? fmtDate(meta.date) : '';
-                    const isActive = selectedPolicy?.id === p.id;
-                    return (
-                      <button key={p.id} onClick={()=>openPolicy(p)} className={`desktop-list-item${isActive?' active':''}`}>
-                        <div style={{display:'flex',alignItems:'center',gap:6,marginBottom:3,minWidth:0}}>
-                          <span style={{fontSize:13.5,fontWeight:600,color:isActive?'var(--accent-text)':'var(--text)',flex:1,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{p.name}</span>
-                          <PrivateBadge visibility={p.visibility} small/>
-                        </div>
-                        <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:6}}>
-                          <span style={{fontSize:11.5,color:'var(--text-3)',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{p.primary_category}{p.secondary_category?` · ${p.secondary_category}`:''}</span>
-                          <span style={{fontSize:10.5,color:'var(--text-3)',flexShrink:0}}>{policyDate||docType}</span>
-                        </div>
-                      </button>
-                    );
-                  })
-                )}
-              </div>
+            </div>
+
+            {/* List toggle bar */}
+            <div className="panel-collapse-bar" title={listOpen?'Collapse policy list':'Expand policy list'} onClick={()=>setListOpen(o=>!o)}>
+              <div className="bar-handle"/>
+              <span className="bar-arrow" style={{fontSize:9,top:'50%',transform:'translateY(-50%)',marginTop:-20}}>
+                {listOpen?'◀':'▶'}
+              </span>
             </div>
 
             {/* Policy Detail */}
