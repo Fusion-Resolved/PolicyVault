@@ -190,11 +190,11 @@
     .desktop-sidebar { overflow-y: auto; background: var(--bg); overflow-x: hidden; transition: width 0.22s cubic-bezier(0.22,1,0.36,1); }
     .desktop-list { overflow-y: auto; background: var(--surface); overflow-x: hidden; transition: width 0.22s cubic-bezier(0.22,1,0.36,1); }
     .desktop-detail { overflow-y: auto; background: var(--bg); min-width: 0; }
-    .panel-collapse-bar { flex-shrink: 0; width: 18px; border-right: 1px solid var(--border); background: var(--bg); display: flex; align-items: center; justify-content: center; cursor: pointer; transition: background 0.13s; position: relative; }
+    .panel-collapse-bar { flex-shrink: 0; width: 18px; border-right: 1px solid var(--border); background: var(--bg); display: flex; align-items: center; justify-content: center; position: relative; transition: background 0.13s; }
     .panel-collapse-bar:hover { background: var(--surface-2); }
-    .panel-collapse-bar .bar-handle { width: 3px; height: 32px; border-radius: 3px; background: var(--border-2); transition: background 0.13s; }
+    .panel-collapse-bar .bar-handle { width: 3px; height: 32px; border-radius: 3px; background: var(--border-2); transition: background 0.13s; pointer-events: none; }
     .panel-collapse-bar:hover .bar-handle { background: var(--accent); }
-    .panel-collapse-bar .bar-arrow { position: absolute; color: var(--text-3); transition: color 0.13s; }
+    .panel-collapse-bar .bar-arrow { position: absolute; color: var(--text-3); transition: color 0.13s; font-size: 9px; pointer-events: none; }
     .panel-collapse-bar:hover .bar-arrow { color: var(--accent); }
     .desktop-sidebar-item { width: 100%; text-align: left; padding: 10px 16px; background: transparent; border: none; cursor: pointer; font-family: var(--font-u); font-size: 13.5px; color: var(--text-2); display: flex; align-items: center; gap: 10px; border-radius: var(--r); transition: background 0.12s, color 0.12s; }
     .desktop-sidebar-item:hover { background: var(--surface-2); color: var(--text); }
@@ -1437,9 +1437,47 @@
       const [searching, setSearching] = useState(false);
       const [actionMenu, setActionMenu] = useState(false);
       const [policyGroupIds, setPolicyGroupIds] = useState([]);
+      const [sidebarWidth, setSidebarWidth] = useState(230);
+      const [listWidth, setListWidth] = useState(310);
       const [sidebarOpen, setSidebarOpen] = useState(true);
       const [listOpen, setListOpen] = useState(true);
+      const sidebarPrev = useRef(230);
+      const listPrev = useRef(310);
       const searchRef = useRef(null);
+
+      const SIDEBAR_MIN = 160; const SIDEBAR_MAX = 420;
+      const LIST_MIN = 200;    const LIST_MAX = 520;
+
+      const makeResizeHandler = (which) => (e) => {
+        e.preventDefault();
+        const startX = e.clientX;
+        const startW = which === 'sidebar' ? sidebarWidth : listWidth;
+        let moved = false;
+        const onMove = (ev) => {
+          if (Math.abs(ev.clientX - startX) > 3) moved = true;
+          const delta = ev.clientX - startX;
+          const newW = Math.max(which==='sidebar'?SIDEBAR_MIN:LIST_MIN, Math.min(which==='sidebar'?SIDEBAR_MAX:LIST_MAX, startW + delta));
+          if (which === 'sidebar') { setSidebarWidth(newW); sidebarPrev.current = newW; }
+          else { setListWidth(newW); listPrev.current = newW; }
+        };
+        const onUp = () => {
+          if (!moved) {
+            if (which === 'sidebar') toggleSidebar();
+            else toggleList();
+          }
+          document.removeEventListener('mousemove', onMove);
+          document.removeEventListener('mouseup', onUp);
+          document.body.style.cursor='';
+          document.body.style.userSelect='';
+        };
+        document.addEventListener('mousemove', onMove);
+        document.addEventListener('mouseup', onUp);
+        document.body.style.cursor='col-resize';
+        document.body.style.userSelect='none';
+      };
+
+      const toggleSidebar = () => { if(sidebarOpen) sidebarPrev.current=sidebarWidth; setSidebarOpen(o=>!o); };
+      const toggleList    = () => { if(listOpen) listPrev.current=listWidth; setListOpen(o=>!o); };
 
       const loadPolicies = useCallback(async (cat) => {
         setListLoading(true); setPolicies([]);
@@ -1502,28 +1540,29 @@
               {searching&&<span style={{position:'absolute',right:10,display:'flex'}}><I.Spin/></span>}
               {searchQuery&&!searching&&<button onClick={()=>setSearchQuery('')} style={{position:'absolute',right:9,background:'transparent',border:'none',cursor:'pointer',color:'var(--text-3)',display:'flex',padding:2}}><I.X/></button>}
             </div>
-            <div style={{flex:1}}/>
-            {isAdmin&&(
-              <button onClick={onNewPolicy} style={{display:'flex',alignItems:'center',gap:6,padding:'6px 13px',background:'var(--accent)',border:'none',borderRadius:'var(--r)',cursor:'pointer',color:'#fff',fontSize:13,fontWeight:700,fontFamily:'var(--font-u)',boxShadow:'0 2px 8px rgba(27,82,68,0.22)'}}>
-                <I.Plus/> New Policy
+            <div style={{marginLeft:'auto',display:'flex',alignItems:'center',gap:10,flexShrink:0}}>
+              {isAdmin&&(
+                <button onClick={onNewPolicy} style={{display:'flex',alignItems:'center',gap:6,padding:'6px 13px',background:'var(--accent)',border:'none',borderRadius:'var(--r)',cursor:'pointer',color:'#fff',fontSize:13,fontWeight:700,fontFamily:'var(--font-u)',boxShadow:'0 2px 8px rgba(27,82,68,0.22)'}}>
+                  <I.Plus/> New Policy
+                </button>
+              )}
+              <button onClick={onToggleDark} className="desktop-icon-btn" title="Toggle theme">
+                {dark ? <I.Sun/> : <I.Moon/>}
               </button>
-            )}
-            <button onClick={onToggleDark} className="desktop-icon-btn" title="Toggle theme">
-              {dark ? <I.Sun/> : <I.Moon/>}
-            </button>
-            <button onClick={onOpenSettings} className="desktop-icon-btn" title="Settings">
-              <I.Settings/>
-            </button>
-            <div style={{width:32,height:32,borderRadius:'50%',background:'var(--accent-muted)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:11,fontWeight:700,color:'var(--accent)',cursor:'pointer',border:'1px solid var(--border-2)',flexShrink:0}} onClick={onOpenSettings} title={profile?.email}>
-              {(profile?.email||'?')[0].toUpperCase()}
+              <button onClick={onOpenSettings} className="desktop-icon-btn" title="Settings">
+                <I.Settings/>
+              </button>
+              <div style={{width:32,height:32,borderRadius:'50%',background:'var(--accent-muted)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:11,fontWeight:700,color:'var(--accent)',cursor:'pointer',border:'1px solid var(--border-2)',flexShrink:0}} onClick={onOpenSettings} title={profile?.email}>
+                {(profile?.email||'?')[0].toUpperCase()}
+              </div>
             </div>
           </div>
 
           {/* 3-pane body */}
-          <div className="desktop-body" style={{gridTemplateColumns:`${sidebarOpen?'230px':'0px'} 18px ${listOpen?'310px':'0px'} 18px 1fr`}}>
+          <div className="desktop-body" style={{gridTemplateColumns:`${sidebarOpen?sidebarWidth+'px':'0px'} 18px ${listOpen?listWidth+'px':'0px'} 18px 1fr`}}>
             {/* Sidebar */}
-            <div className="desktop-sidebar" style={{width:sidebarOpen?230:0,borderRight:'none'}}>
-              <div style={{width:230,padding:'12px 10px 8px'}}>
+            <div className="desktop-sidebar" style={{width:sidebarOpen?sidebarWidth:0,borderRight:'none'}}>
+              <div style={{width:sidebarWidth,padding:'12px 10px 8px'}}>
                 <div style={{fontSize:9.5,fontWeight:700,color:'var(--text-3)',letterSpacing:'0.1em',textTransform:'uppercase',padding:'0 8px',marginBottom:6}}>Series</div>
                 <button onClick={()=>{ setSelectedCategory(null); setSearchQuery(''); }} className={`desktop-sidebar-item${selectedCategory===null&&!searchQuery?' active':''}`} style={{width:'100%',borderRadius:'var(--r)'}}>
                   <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
@@ -1543,16 +1582,16 @@
             </div>
 
             {/* Sidebar toggle bar */}
-            <div className="panel-collapse-bar" title={sidebarOpen?'Collapse series panel':'Expand series panel'} onClick={()=>setSidebarOpen(o=>!o)}>
+            <div className="panel-collapse-bar" title={sidebarOpen?'Drag to resize · Click to collapse':'Click to expand'} onMouseDown={sidebarOpen ? makeResizeHandler('sidebar') : undefined} onClick={!sidebarOpen ? toggleSidebar : undefined} style={{cursor:sidebarOpen?'col-resize':'pointer'}}>
               <div className="bar-handle"/>
-              <span className="bar-arrow" style={{fontSize:9,top:'50%',transform:'translateY(-50%)',marginTop:-20}}>
+              <span className="bar-arrow" style={{fontSize:9,position:'absolute',top:'calc(50% - 20px)',left:'50%',transform:'translate(-50%,-50%)'}}>
                 {sidebarOpen?'◀':'▶'}
               </span>
             </div>
 
             {/* Policy List */}
-            <div className="desktop-list" style={{width:listOpen?310:0,borderRight:'none'}}>
-              <div style={{width:310}}>
+            <div className="desktop-list" style={{width:listOpen?listWidth:0,borderRight:'none'}}>
+              <div style={{width:listWidth}}>
                 <div style={{padding:'12px 16px 10px',borderBottom:'1px solid var(--border)',display:'flex',alignItems:'center',justifyContent:'space-between',flexShrink:0,background:'var(--surface)'}}>
                   <div>
                     <div style={{fontSize:13,fontWeight:700,color:'var(--text)'}}>{searchQuery ? 'Search Results' : (selectedCategory || 'All Policies')}</div>
@@ -1592,9 +1631,9 @@
             </div>
 
             {/* List toggle bar */}
-            <div className="panel-collapse-bar" title={listOpen?'Collapse policy list':'Expand policy list'} onClick={()=>setListOpen(o=>!o)}>
+            <div className="panel-collapse-bar" title={listOpen?'Drag to resize · Click to collapse':'Click to expand'} onMouseDown={listOpen ? makeResizeHandler('list') : undefined} onClick={!listOpen ? toggleList : undefined} style={{cursor:listOpen?'col-resize':'pointer'}}>
               <div className="bar-handle"/>
-              <span className="bar-arrow" style={{fontSize:9,top:'50%',transform:'translateY(-50%)',marginTop:-20}}>
+              <span className="bar-arrow" style={{fontSize:9,position:'absolute',top:'calc(50% - 20px)',left:'50%',transform:'translate(-50%,-50%)'}}>
                 {listOpen?'◀':'▶'}
               </span>
             </div>
